@@ -255,7 +255,38 @@ app.get("/api/products", async (req, res) => {
     const limit = Number(req.query.limit) || 1000;
     const warehouseFilter = req.query.warehouse as string;
     
-    const data = await coreGet("/ProductAvailability", { page, limit });
+    // Fetch ALL availability data using pagination with no artificial limits
+    let allAvailabilityData = [];
+    let currentPage = 1;
+    let totalFetched = 0;
+    
+    do {
+      log(`Fetching availability page ${currentPage} (max 1000 per page due to Cin7 API limit)...`);
+      const pageData = await coreGet("/ProductAvailability", { 
+        page: currentPage, 
+        limit: 1000 
+      });
+      
+      const pageRecords = pageData.ProductAvailability || [];
+      allAvailabilityData = allAvailabilityData.concat(pageRecords);
+      totalFetched += pageRecords.length;
+      
+      log(`📊 Page ${currentPage}: ${pageRecords.length} records (Total: ${totalFetched})`);
+      
+      // Continue if we got a full page
+      if (pageRecords.length === 1000) {
+        currentPage++;
+      } else {
+        break;
+      }
+      
+      // Continue pagination indefinitely until we get ALL data
+      if (currentPage > 100) {
+        log(`📈 Large dataset: page ${currentPage} - continuing to fetch ALL data...`);
+      }
+    } while (true);
+    
+    const data = { ProductAvailability: allAvailabilityData, Total: totalFetched };
     log(`Cin7 ProductAvailability response: ${JSON.stringify(data).substring(0, 200)}...`);
     
     // Filter to only allowed warehouse locations
@@ -489,7 +520,7 @@ app.get("/api/availability", async (req, res) => {
 app.get("/api/core/customers", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 100);
+    const limit = Number(req.query.limit || 10000);
     const data = await coreGet("/Customers", { page, limit });
     res.json(data);
   } catch (e: any) {
@@ -525,7 +556,7 @@ app.get("/api/product-images/:sku", async (req, res) => {
 app.get("/api/core/products", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 50);
+    const limit = Number(req.query.limit || 10000);
     const data = await coreGet("/ProductMaster", { page, limit });
     res.json(data);
   } catch (e: any) {
@@ -536,7 +567,7 @@ app.get("/api/core/products", async (req, res) => {
 app.get("/api/core/attachments", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 50);
+    const limit = Number(req.query.limit || 10000);
     const productId = req.query.productid as string;
     
     const params: any = { page, limit };
@@ -563,7 +594,7 @@ app.get("/api/core/locations", async (req, res) => {
 app.get("/api/core/availability", async (req, res) => {
   try {
     const page = Number(req.query.page || 1);
-    const limit = Number(req.query.limit || 100);
+    const limit = Number(req.query.limit || 10000);
     const { sku, name, location } = req.query;
 
     const data = await coreGet("/ProductAvailability", {
@@ -730,10 +761,9 @@ app.get("/catalog", async (req, res) => {
         break;
       }
       
-      // Safety limit to prevent infinite loops
-      if (currentPage > 20) {
-        log(`⚠️ Reached safety limit of 20 pages (20,000 records)`);
-        break;
+      // Continue pagination to get ALL data - no artificial limits
+      if (currentPage > 50) {
+        log(`📈 Fetching extensive dataset: page ${currentPage} (continuing...)`);
       }
     } while (true);
     
@@ -765,10 +795,9 @@ app.get("/catalog", async (req, res) => {
         break;
       }
       
-      // Safety limit to prevent infinite loops
-      if (currentPage > 20) {
-        log(`⚠️ Reached safety limit of 20 pages (20,000 products)`);
-        break;
+      // Continue pagination to get ALL products - no artificial limits
+      if (currentPage > 50) {
+        log(`💰 Fetching extensive product dataset: page ${currentPage} (continuing...)`);
       }
     } while (true);
     
