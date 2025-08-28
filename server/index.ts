@@ -228,9 +228,21 @@ app.get("/api/products", async (req, res) => {
     const productDetails = new Map();
     for (const sku of Array.from(productMap.keys()).slice(0, 10)) {
       try {
-        const productResponse = await coreGet('/Products', { qs: { sku } });
+        log(`Fetching product details for SKU: ${sku}`);
+        // Try searching for product by SKU
+        const productResponse = await coreGet('/Products', { 
+          qs: { 
+            where: `SKU='${sku}'`,
+            limit: 1
+          } 
+        });
+        log(`Product response for ${sku}: Found ${productResponse?.length || 0} products`);
         if (productResponse && productResponse.length > 0) {
-          productDetails.set(sku, productResponse[0]);
+          const product = productResponse[0];
+          log(`Product ${sku} Category: "${product.Category}" Brand: "${product.Brand}"`);
+          productDetails.set(sku, product);
+        } else {
+          log(`No product found for SKU: ${sku}`);
         }
       } catch (error) {
         log(`Failed to fetch product details for ${sku}: ${error}`);
