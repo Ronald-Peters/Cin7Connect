@@ -257,8 +257,8 @@ app.get("/api/products", async (req, res) => {
         
         // Get real category from Cin7 product details
         const productDetail = productDetails.get(item.sku);
-        const categoryName = productDetail?.Category || productDetail?.Brand || 'Tire Product';
-        log(`Final category for ${item.sku}: "${categoryName}"`);
+        const categoryName = productDetail?.Category || 'Tire Product';
+        log(`Final category for ${item.sku}: "${categoryName}" (productDetail: ${JSON.stringify(productDetail)})`);
         
         return {
           id: index + 1,
