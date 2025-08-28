@@ -1640,20 +1640,34 @@ app.post("/api/checkout", async (req, res) => {
 // Serve static assets including logo
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
-// Serve demo page as default
-app.get("/", (req, res) => {
-  res.setHeader('Content-Type', 'text/html');
-  res.sendFile(path.resolve(__dirname, "../client/demo.html"));
-});
-
-// Catch all handler for client-side routing
-app.get("*", (req, res) => {
-  if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+// Serve built frontend assets in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.resolve(__dirname, "public")));
+  
+  // Catch all handler for client-side routing in production
+  app.get("*", (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+      res.sendFile(path.resolve(__dirname, "public/index.html"));
+    } else {
+      res.status(404).send('Not found');
+    }
+  });
+} else {
+  // Development: Serve demo page as default
+  app.get("/", (req, res) => {
+    res.setHeader('Content-Type', 'text/html');
     res.sendFile(path.resolve(__dirname, "../client/demo.html"));
-  } else {
-    res.status(404).send('Not found');
-  }
-});
+  });
+
+  // Catch all handler for client-side routing in development
+  app.get("*", (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+      res.sendFile(path.resolve(__dirname, "../client/demo.html"));
+    } else {
+      res.status(404).send('Not found');
+    }
+  });
+}
 
 const port = parseInt(process.env.PORT || '5000', 10);
 app.listen(port, "0.0.0.0", () => {
