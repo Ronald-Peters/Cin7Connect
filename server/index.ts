@@ -1642,39 +1642,19 @@ app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_
 
 // Serve built frontend assets in production
 if (process.env.NODE_ENV === 'production') {
-  // Try multiple possible paths for static files
-  const publicPaths = [
-    path.resolve(__dirname, "public"),
-    path.resolve(__dirname, "../dist/public"),
-    path.resolve(__dirname, "../../dist/public")
-  ];
-  
-  let staticPath = publicPaths[0];
-  for (const testPath of publicPaths) {
-    try {
-      if (require('fs').existsSync(testPath)) {
-        staticPath = testPath;
-        break;
-      }
-    } catch (e) {
-      // Continue to next path
-    }
-  }
-  
+  // Production: Serve the built React app
+  const staticPath = path.resolve(__dirname, "public");
   log(`🗂️ Serving static files from: ${staticPath}`);
   app.use(express.static(staticPath));
   
-  // Catch all handler for client-side routing in production
+  // Serve React app for all non-API routes
   app.get("*", (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+    if (!req.path.startsWith('/api')) {
       const indexPath = path.join(staticPath, "index.html");
-      if (require('fs').existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).send('Frontend not found');
-      }
+      log(`📄 Serving React app: ${indexPath} for route: ${req.path}`);
+      res.sendFile(indexPath);
     } else {
-      res.status(404).send('Not found');
+      res.status(404).send('API route not found');
     }
   });
 } else {
