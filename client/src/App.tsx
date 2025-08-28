@@ -25,6 +25,7 @@ function App() {
       <AuthProvider>
         <Switch>
           <ProtectedRoute path="/" component={HomePage} />
+          <ProtectedRoute path="/catalog" component={HomePage} />
           <Route path="/auth" component={AuthPage} />
           <Route path="/admin" component={AdminPage} />
           <ProtectedRoute path="/cart" component={CartPage} />
