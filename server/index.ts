@@ -731,13 +731,16 @@ app.get("/catalog", async (req, res) => {
       const sampleSku = filteredAvailability[0].SKU;
       const samplePricing = pricingMap.get(sampleSku);
       
-      // Count categories for verification
+      // Count categories for verification (excluding Claims)
       const categoryStats = {};
       Array.from(pricingMap.values()).forEach(product => {
         const cat = product.category || 'No Category';
-        categoryStats[cat] = (categoryStats[cat] || 0) + 1;
+        if (cat !== 'Claims') { // Exclude Claims from client catalog
+          categoryStats[cat] = (categoryStats[cat] || 0) + 1;
+        }
       });
-      log(`📂 Categories loaded: ${Object.keys(categoryStats).length} categories from Cin7`);
+      log(`📂 Categories loaded: ${Object.keys(categoryStats).length} customer categories from Cin7`);
+      log(`🚫 Claims category excluded from customer catalog`);
     }
     
     // Group stock by product and combine warehouse totals
@@ -797,7 +800,10 @@ app.get("/catalog", async (req, res) => {
     
     // Show products with the highest stock levels to verify stock data
     const allProducts = Array.from(productMap.values());
-    const productsWithStock = allProducts.filter(item => item.available > 0);
+    const productsWithStock = allProducts.filter(item => 
+      item.available > 0 && 
+      item.category !== 'Claims' // Exclude Claims from customer-facing catalog
+    );
     
     // Sort by total available stock to show products with most inventory first
     const selectedProducts = productsWithStock
