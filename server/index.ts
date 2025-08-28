@@ -345,7 +345,7 @@ app.get("/api/availability", async (req, res) => {
     
     const data = await coreGet("/ProductAvailability", { 
       page: 1, 
-      limit: productSku ? 50 : 100 
+      limit: productSku ? 50 : 1000 
     });
     
     // Filter to only allowed warehouse locations
@@ -618,8 +618,8 @@ app.get("/app", (req, res) => {
 app.get("/catalog", async (req, res) => {
   try {
     log("Loading live product catalog from Cin7...");
-    // Get more data to ensure we capture all warehouse locations
-    const data = await coreGet("/ProductAvailability", { page: 1, limit: 200 });
+    // Fetch comprehensive data to capture all 1000+ product lines across all warehouses
+    const data = await coreGet("/ProductAvailability", { page: 1, limit: 1000 });
     
     const availabilityArray = data.ProductAvailability || [];
     
