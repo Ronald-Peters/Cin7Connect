@@ -1,6 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function log(message: string) {
+  console.log(`[${new Date().toISOString()}] ${message}`);
+}
 
 const app = express();
 app.use(express.json());
@@ -36,36 +42,112 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  const server = await registerRoutes(app);
+// Demo API routes with Reivilo branding
+app.get("/api/user", (req, res) => {
+  res.json({ id: 1, username: "demo", companyName: "Demo Company" });
+});
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
+app.get("/api/products", (req, res) => {
+  res.json({
+    products: [
+      {
+        id: 1,
+        sku: "REI001",
+        name: "Premium Business Solution",
+        description: "A high-quality business solution from Reivilo - 45 years of excellence",
+        price: 299.99,
+        currency: "ZAR"
+      },
+      {
+        id: 2,
+        sku: "REI002", 
+        name: "Enterprise Package",
+        description: "Comprehensive enterprise solution with family business values since 1980",
+        price: 599.99,
+        currency: "ZAR"
+      },
+      {
+        id: 3,
+        sku: "REI003",
+        name: "Professional Service",
+        description: "Professional grade service with Reivilo's proven track record",
+        price: 199.99,
+        currency: "ZAR"
+      }
+    ],
+    total: 3
   });
+});
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
+app.get("/api/warehouses", (req, res) => {
+  res.json([
+    { id: 1, name: "Cape Town Main", location: "Cape Town" },
+    { id: 2, name: "Johannesburg Branch", location: "Johannesburg" },
+    { id: 3, name: "Durban Facility", location: "Durban" }
+  ]);
+});
+
+app.get("/api/availability", (req, res) => {
+  res.json([
+    { productId: 1, warehouseId: 1, available: 45, onHand: 50, onOrder: 25 },
+    { productId: 1, warehouseId: 2, available: 30, onHand: 35, onOrder: 10 },
+    { productId: 1, warehouseId: 3, available: 20, onHand: 25, onOrder: 15 },
+    { productId: 2, warehouseId: 1, available: 80, onHand: 85, onOrder: 40 },
+    { productId: 2, warehouseId: 2, available: 60, onHand: 65, onOrder: 20 },
+    { productId: 2, warehouseId: 3, available: 35, onHand: 40, onOrder: 25 },
+    { productId: 3, warehouseId: 1, available: 100, onHand: 110, onOrder: 50 },
+    { productId: 3, warehouseId: 2, available: 75, onHand: 80, onOrder: 30 },
+    { productId: 3, warehouseId: 3, available: 55, onHand: 60, onOrder: 20 }
+  ]);
+});
+
+app.get("/api/cart", (req, res) => {
+  res.json({ items: [], location: "Cape Town Main" });
+});
+
+// Serve specific assets from client directory 
+app.use('/attached_assets', express.static(path.resolve(__dirname, "../attached_assets")));
+app.use('/src', express.static(path.resolve(__dirname, "../client/src"), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js') || path.endsWith('.jsx') || path.endsWith('.ts') || path.endsWith('.tsx')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
   }
+}));
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
+// Error handling middleware
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
+  log(`Error: ${message}`);
+});
+
+// Handle module imports
+app.get('/src/*', (req, res) => {
+  const filePath = path.resolve(__dirname, "../client", req.path.slice(1));
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(filePath);
+});
+
+// Serve demo page as default
+app.get("/", (req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.sendFile(path.resolve(__dirname, "../client/demo.html"));
+});
+
+// Catch all handler for client-side routing
+app.get("*", (req, res) => {
+  if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+    res.sendFile(path.resolve(__dirname, "../client/demo.html"));
+  } else {
+    res.status(404).send('Not found');
+  }
+});
+
+const port = parseInt(process.env.PORT || '5000', 10);
+app.listen(port, "0.0.0.0", () => {
+  log(`🚀 Reivilo B2B Portal running on port ${port}`);
+  log(`📈 45 Years of Family Business Values Since 1980`);
+  log(`🌐 Visit: http://localhost:${port}`);
+});
