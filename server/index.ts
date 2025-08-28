@@ -102,73 +102,198 @@ app.get("/api/user", (req, res) => {
 
 app.get("/api/products", async (req, res) => {
   try {
-    log("Fetching products from Cin7 ProductAvailability...");
+    log("Fetching products from Cin7 ProductAvailability (filtered warehouses)...");
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 50;
+    const warehouseFilter = req.query.warehouse as string;
     
     const data = await coreGet("/ProductAvailability", { page, limit });
     log(`Cin7 ProductAvailability response: ${JSON.stringify(data).substring(0, 200)}...`);
     
-    // Extract products from ProductAvailability response
+    // Filter to only allowed warehouse locations
+    const allowedWarehouses = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"];
     const availabilityArray = data.ProductAvailability || [];
-    const products = availabilityArray.slice(0, 10).map((item: any, index: number) => ({
+    
+    // Filter data to only show stock from allowed warehouses
+    const filteredAvailability = availabilityArray.filter((item: any) => 
+      allowedWarehouses.includes(item.Location)
+    );
+    
+    // Group stock by product and combine warehouse totals
+    const productMap = new Map();
+    
+    filteredAvailability.forEach((item: any) => {
+      const sku = item.SKU;
+      if (!productMap.has(sku)) {
+        productMap.set(sku, {
+          sku: sku,
+          name: item.Name || item.ProductName,
+          available: 0,
+          onHand: 0,
+          onOrder: 0,
+          warehouseBreakdown: {
+            jhb: { available: 0, onHand: 0, onOrder: 0 }, // B-VDB + S-POM
+            cpt: { available: 0, onHand: 0, onOrder: 0 }, // B-CPT + S-CPT
+            bfn: { available: 0, onHand: 0, onOrder: 0 }  // S-BFN
+          }
+        });
+      }
+      
+      const product = productMap.get(sku);
+      product.available += item.Available || 0;
+      product.onHand += item.OnHand || 0;
+      product.onOrder += item.OnOrder || 0;
+      
+      // Group into customer-facing warehouse regions
+      if (["B-VDB", "S-POM"].includes(item.Location)) {
+        product.warehouseBreakdown.jhb.available += item.Available || 0;
+        product.warehouseBreakdown.jhb.onHand += item.OnHand || 0;
+        product.warehouseBreakdown.jhb.onOrder += item.OnOrder || 0;
+      } else if (["B-CPT", "S-CPT"].includes(item.Location)) {
+        product.warehouseBreakdown.cpt.available += item.Available || 0;
+        product.warehouseBreakdown.cpt.onHand += item.OnHand || 0;
+        product.warehouseBreakdown.cpt.onOrder += item.OnOrder || 0;
+      } else if (item.Location === "S-BFN") {
+        product.warehouseBreakdown.bfn.available += item.Available || 0;
+        product.warehouseBreakdown.bfn.onHand += item.OnHand || 0;
+        product.warehouseBreakdown.bfn.onOrder += item.OnOrder || 0;
+      }
+    });
+    
+    // Convert map to array and format for frontend
+    const products = Array.from(productMap.values()).slice(0, 10).map((item: any, index: number) => ({
       id: index + 1,
-      sku: item.SKU || `REI00${index + 1}`,
-      name: item.Name || item.ProductName || `Product ${index + 1}`,
-      description: `${item.Name || item.ProductName || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
+      sku: item.sku || `REI00${index + 1}`,
+      name: item.name || `Product ${index + 1}`,
+      description: `${item.name || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
       price: 299.99, // Pricing would come from Cin7 price tiers
       currency: "ZAR",
-      available: item.Available || 0,
-      onHand: item.OnHand || 0,
-      onOrder: item.OnOrder || 0
+      available: item.available,
+      onHand: item.onHand,
+      onOrder: item.onOrder,
+      warehouseBreakdown: item.warehouseBreakdown
     }));
     
     res.json({
       products,
-      total: products.length
+      total: products.length,
+      filteredWarehouses: allowedWarehouses
     });
-    log(`Successfully returned ${products.length} products from Cin7`);
+    log(`Successfully returned ${products.length} products with filtered warehouse stock from ${filteredAvailability.length} availability records`);
   } catch (error: any) {
     log(`Error fetching products: ${error.message}`);
-    log(`Availability array type: ${typeof availabilityArray}, is array: ${Array.isArray(availabilityArray)}`);
     res.status(500).json({ error: "Failed to fetch products from inventory system" });
   }
 });
 
 app.get("/api/warehouses", async (req, res) => {
   try {
-    log("Fetching warehouses from Cin7 Locations...");
+    log("Fetching filtered warehouses from Cin7 Locations...");
     const data = await coreGet("/Locations", { page: 1, limit: 500 });
     log(`Cin7 Locations response: ${JSON.stringify(data).substring(0, 200)}...`);
     
-    // Extract locations from response
+    // Filter and group warehouses according to business requirements
+    const allowedWarehouses = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"];
     const locationsData = data.Locations || data.locations || data || [];
-    const warehouses = locationsData.map((location: any, index: number) => ({
-      id: index + 1,
-      name: location.Name || location.LocationName || `Location ${index + 1}`,
-      location: location.Name || location.LocationName || "Unknown"
-    }));
     
-    res.json(warehouses);
-    log(`Successfully returned ${warehouses.length} warehouses from Cin7`);
+    // Filter to only allowed warehouse locations
+    const filteredLocations = locationsData.filter((location: any) => 
+      allowedWarehouses.includes(location.Name)
+    );
+    
+    // Group warehouses for customer-facing display
+    const groupedWarehouses = [
+      {
+        id: 1,
+        name: "JHB Warehouse",
+        location: "Johannesburg",
+        description: "Covering Gauteng and surrounding areas",
+        internalLocations: ["B-VDB", "S-POM"]
+      },
+      {
+        id: 2,
+        name: "CPT Warehouse", 
+        location: "Cape Town",
+        description: "Covering Western Cape region",
+        internalLocations: ["B-CPT", "S-CPT"]
+      },
+      {
+        id: 3,
+        name: "BFN Warehouse",
+        location: "Bloemfontein", 
+        description: "Covering Free State and central regions",
+        internalLocations: ["S-BFN"]
+      }
+    ];
+    
+    res.json(groupedWarehouses);
+    log(`Successfully returned ${groupedWarehouses.length} grouped warehouses (filtered from ${filteredLocations.length} allowed locations)`);
   } catch (error: any) {
     log(`Error fetching warehouses: ${error.message}`);
     res.status(500).json({ error: "Failed to fetch warehouse locations" });
   }
 });
 
-app.get("/api/availability", (req, res) => {
-  res.json([
-    { productId: 1, warehouseId: 1, available: 45, onHand: 50, onOrder: 25 },
-    { productId: 1, warehouseId: 2, available: 30, onHand: 35, onOrder: 10 },
-    { productId: 1, warehouseId: 3, available: 20, onHand: 25, onOrder: 15 },
-    { productId: 2, warehouseId: 1, available: 80, onHand: 85, onOrder: 40 },
-    { productId: 2, warehouseId: 2, available: 60, onHand: 65, onOrder: 20 },
-    { productId: 2, warehouseId: 3, available: 35, onHand: 40, onOrder: 25 },
-    { productId: 3, warehouseId: 1, available: 100, onHand: 110, onOrder: 50 },
-    { productId: 3, warehouseId: 2, available: 75, onHand: 80, onOrder: 30 },
-    { productId: 3, warehouseId: 3, available: 55, onHand: 60, onOrder: 20 }
-  ]);
+app.get("/api/availability", async (req, res) => {
+  try {
+    const productSku = req.query.sku as string;
+    log(`Fetching availability for ${productSku ? `SKU: ${productSku}` : 'all products'} from filtered warehouses...`);
+    
+    const data = await coreGet("/ProductAvailability", { 
+      page: 1, 
+      limit: productSku ? 50 : 100 
+    });
+    
+    // Filter to only allowed warehouse locations
+    const allowedWarehouses = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"];
+    const availabilityArray = data.ProductAvailability || [];
+    
+    let filteredAvailability = availabilityArray.filter((item: any) => 
+      allowedWarehouses.includes(item.Location)
+    );
+    
+    // Filter by SKU if requested
+    if (productSku) {
+      filteredAvailability = filteredAvailability.filter((item: any) => 
+        item.SKU === productSku
+      );
+    }
+    
+    // Group by warehouse regions and products
+    const availability = filteredAvailability.map((item: any) => {
+      let warehouseGroup = "";
+      let warehouseId = 0;
+      
+      if (["B-VDB", "S-POM"].includes(item.Location)) {
+        warehouseGroup = "JHB Warehouse";
+        warehouseId = 1;
+      } else if (["B-CPT", "S-CPT"].includes(item.Location)) {
+        warehouseGroup = "CPT Warehouse";
+        warehouseId = 2;
+      } else if (item.Location === "S-BFN") {
+        warehouseGroup = "BFN Warehouse";
+        warehouseId = 3;
+      }
+      
+      return {
+        productSku: item.SKU,
+        productName: item.Name,
+        warehouseId: warehouseId,
+        warehouseName: warehouseGroup,
+        internalLocation: item.Location,
+        available: item.Available || 0,
+        onHand: item.OnHand || 0,
+        onOrder: item.OnOrder || 0,
+        stockValue: item.StockOnHand || 0
+      };
+    });
+    
+    res.json(availability);
+    log(`Successfully returned ${availability.length} availability records from filtered warehouses`);
+  } catch (error: any) {
+    log(`Error fetching availability: ${error.message}`);
+    res.status(500).json({ error: "Failed to fetch stock availability" });
+  }
 });
 
 // Core API endpoints matching the working implementation  
