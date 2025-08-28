@@ -1533,9 +1533,9 @@ app.get("/catalog", async (req, res) => {
   } catch (error: any) {
     log(`Error generating catalog: ${error.message}`);
     
-    // If we have cached data and we're getting rate limited, serve cached version
-    if (error.message.includes('API limit') && catalogCache) {
-      log("📋 Serving cached data due to API rate limiting");
+    // If we have any cached data, serve it instead of showing an error
+    if (catalogCache) {
+      log("📋 Serving cached catalog data to avoid rate limiting");
       return res.send(catalogCache);
     }
     
