@@ -186,28 +186,51 @@ export function ProductTable() {
                       <tr key={product.id} className="hover:bg-muted/20 transition-colors" data-testid={`row-product-${product.id}`}>
                         <td className="px-6 py-4">
                           <div className="flex items-center">
-                            {product.imageUrl ? (
+                            {product.imageUrl || (product.images && product.images.length > 0) ? (
                               <img 
-                                src={product.imageUrl} 
+                                src={product.imageUrl || product.images[0]} 
                                 alt={product.name} 
-                                className="h-12 w-12 rounded-md object-cover" 
+                                className="h-12 w-12 rounded-md object-cover border" 
                                 data-testid={`img-product-${product.id}`}
+                                onError={(e) => {
+                                  // If main image fails, try other images or fallback to placeholder
+                                  const img = e.target as HTMLImageElement;
+                                  if (product.images && product.images.length > 1) {
+                                    const currentSrc = img.src;
+                                    const currentIndex = product.images.indexOf(currentSrc);
+                                    if (currentIndex < product.images.length - 1) {
+                                      img.src = product.images[currentIndex + 1];
+                                      return;
+                                    }
+                                  }
+                                  // All images failed, show placeholder
+                                  img.style.display = 'none';
+                                  const placeholder = img.nextElementSibling as HTMLElement;
+                                  if (placeholder) {
+                                    placeholder.style.display = 'flex';
+                                  }
+                                }}
                               />
-                            ) : (
-                              <div 
-                                className="h-12 w-12 rounded-md bg-muted flex items-center justify-center"
-                                data-testid={`placeholder-product-${product.id}`}
-                              >
-                                <span className="text-xs text-muted-foreground">No Image</span>
-                              </div>
-                            )}
-                            <div className="ml-4">
+                            ) : null}
+                            <div 
+                              className="h-12 w-12 rounded-md bg-gradient-to-br from-royal-blue/10 to-royal-blue/20 flex items-center justify-center border"
+                              style={{ display: product.imageUrl || (product.images && product.images.length > 0) ? 'none' : 'flex' }}
+                              data-testid={`placeholder-product-${product.id}`}
+                            >
+                              <span className="text-xs text-royal-blue font-medium">{product.sku.slice(0, 3)}</span>
+                            </div>
+                            <div className="ml-4 flex-1">
                               <div className="text-sm font-medium text-foreground" data-testid={`text-product-name-${product.id}`}>
                                 {product.name || product.sku}
                               </div>
                               <div className="text-sm text-muted-foreground" data-testid={`text-product-brand-${product.id}`}>
                                 {product.brand || "No Brand"}
                               </div>
+                              {product.images && product.images.length > 1 && (
+                                <div className="text-xs text-royal-blue mt-1" data-testid={`text-image-count-${product.id}`}>
+                                  {product.images.length} images available
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>

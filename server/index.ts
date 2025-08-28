@@ -76,9 +76,10 @@ async function getProductImages(sku: string): Promise<string[]> {
     
     if (productData?.Products?.length > 0) {
       const product = productData.Products[0];
-      const images: string[] = [];
+      const productId = product.ID;
+      let images: string[] = [];
       
-      // Check for product images in the Images array
+      // First check for product images in the Images array (if available in basic product response)
       if (product.Images && Array.isArray(product.Images)) {
         product.Images.forEach((img: any) => {
           if (img.URL || img.url) {
@@ -87,13 +88,97 @@ async function getProductImages(sku: string): Promise<string[]> {
         });
       }
       
-      // Also check for other image fields that might exist
+      // Also check for other image fields that might exist in product response
       if (product.ImageURL) {
         images.push(product.ImageURL);
       }
       
+      // Check for additional image-related fields in the product data
+      const imageFields = ['ImageURL', 'Image', 'ThumbURL', 'PhotoURL', 'Picture', 'MainImage'];
+      imageFields.forEach(field => {
+        if (product[field] && typeof product[field] === 'string' && product[field].trim()) {
+          images.push(product[field]);
+        }
+      });
+      
+      // Check for attachments or files array in product data
+      if (product.Attachments && Array.isArray(product.Attachments)) {
+        const attachmentImages = product.Attachments
+          .filter((attachment: any) => {
+            const fileName = attachment.FileName || attachment.filename || attachment.Name || '';
+            return fileName.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i);
+          })
+          .map((attachment: any) => attachment.URL || attachment.url || attachment.Link)
+          .filter((url: string) => url && url.trim().length > 0);
+        images = images.concat(attachmentImages);
+      }
+      
+      // If still no images found and we have a product ID, try attachment endpoints
+      if (images.length === 0 && productId) {
+        try {
+          // Try multiple possible attachment endpoints
+          const endpoints = [
+            `/externalapi/v2/productAttachment?ProductID=${productId}`,
+            `/ExternalApi/ProductAttachment?ProductID=${productId}`,
+            `/externalapi/v2/productAttachment?ID=${productId}`,
+            `/ExternalApi/ProductAttachment?ID=${productId}`
+          ];
+          
+          for (const endpoint of endpoints) {
+            try {
+              const attachmentResponse = await fetch(`https://inventory.dearsystems.com${endpoint}`, {
+                headers: {
+                  'api-auth-accountid': process.env.CIN7_ACCOUNT_ID!,
+                  'api-auth-applicationkey': process.env.CIN7_APP_KEY!,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (attachmentResponse.ok) {
+                const attachmentData = await attachmentResponse.json();
+                
+                // Parse attachment response for image files
+                let attachments = [];
+                if (attachmentData?.Attachments) {
+                  attachments = attachmentData.Attachments;
+                } else if (Array.isArray(attachmentData)) {
+                  attachments = attachmentData;
+                }
+                
+                // Filter for image files and extract URLs
+                const attachmentImages = attachments
+                  .filter((attachment: any) => {
+                    const fileName = attachment.FileName || attachment.filename || attachment.Name || '';
+                    return fileName.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i);
+                  })
+                  .map((attachment: any) => {
+                    return attachment.URL || attachment.url || attachment.Link || attachment.FileURL;
+                  })
+                  .filter((url: string) => url && url.trim().length > 0);
+                  
+                if (attachmentImages.length > 0) {
+                  images = images.concat(attachmentImages);
+                  log(`✅ Found ${attachmentImages.length} attachment images for SKU ${sku} via ${endpoint}`);
+                  break; // Found images, no need to try other endpoints
+                }
+              }
+            } catch (endpointError) {
+              // Continue to next endpoint
+              continue;
+            }
+          }
+        } catch (attachmentError) {
+          // Attachment endpoint might not be available or accessible, continue without images
+          // Only log if it's not the common HTML error
+          if (!attachmentError.toString().includes('Unexpected token')) {
+            log(`Could not fetch attachments for ${sku}: ${attachmentError}`);
+          }
+        }
+      }
+      
       // Return images if available
       if (images.length > 0) {
+        log(`✅ Found ${images.length} total images for SKU ${sku}`);
         return images;
       }
     }
@@ -101,7 +186,7 @@ async function getProductImages(sku: string): Promise<string[]> {
     // No images found
     return [];
   } catch (error) {
-    // Error fetching images
+    log(`Error fetching images for ${sku}: ${error}`);
     return [];
   }
 }
