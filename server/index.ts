@@ -110,8 +110,8 @@ app.get("/api/products", async (req, res) => {
     log(`Cin7 ProductAvailability response: ${JSON.stringify(data).substring(0, 200)}...`);
     
     // Extract products from ProductAvailability response
-    const availabilityData = data.ProductAvailabilities || data.productAvailabilities || data || [];
-    const products = availabilityData.slice(0, 10).map((item: any, index: number) => ({
+    const availabilityArray = data.ProductAvailability || [];
+    const products = availabilityArray.slice(0, 10).map((item: any, index: number) => ({
       id: index + 1,
       sku: item.SKU || `REI00${index + 1}`,
       name: item.Name || item.ProductName || `Product ${index + 1}`,
@@ -130,6 +130,7 @@ app.get("/api/products", async (req, res) => {
     log(`Successfully returned ${products.length} products from Cin7`);
   } catch (error: any) {
     log(`Error fetching products: ${error.message}`);
+    log(`Availability array type: ${typeof availabilityArray}, is array: ${Array.isArray(availabilityArray)}`);
     res.status(500).json({ error: "Failed to fetch products from inventory system" });
   }
 });
