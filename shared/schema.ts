@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Users table for authentication
-export const users = pgTable("users", {
+export const users: any = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
@@ -12,7 +12,7 @@ export const users = pgTable("users", {
   role: text("role").default("buyer"), // 'admin', 'buyer'
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-  createdBy: varchar("created_by").references(() => users.id),
+  createdBy: varchar("created_by").references((): any => users.id),
 });
 
 // Customers (cached from Cin7)

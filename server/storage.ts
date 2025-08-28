@@ -69,9 +69,10 @@ export class DatabaseStorage implements IStorage {
       .values({
         email: userData.email,
         password: userData.password,
-        customerId: userData.customerId,
+        customerId: userData.customerId || null,
         role: userData.role || 'buyer',
-        createdBy: userData.createdBy,
+        createdBy: userData.createdBy || null,
+        isActive: true,
       })
       .returning();
     return user;
