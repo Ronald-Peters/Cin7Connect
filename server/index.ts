@@ -72,7 +72,7 @@ async function getProductImages(sku: string): Promise<string[]> {
       qs: { where: `SKU='${sku}'` },
       page: 1,
       limit: 1 
-    });
+    }) as any;
     
     if (productData?.Products?.length > 0) {
       const product = productData.Products[0];
@@ -81,10 +81,15 @@ async function getProductImages(sku: string): Promise<string[]> {
       // Check for product images in the Images array
       if (product.Images && Array.isArray(product.Images)) {
         product.Images.forEach((img: any) => {
-          if (img.URL) {
-            images.push(img.URL);
+          if (img.URL || img.url) {
+            images.push(img.URL || img.url);
           }
         });
+      }
+      
+      // Also check for other image fields that might exist
+      if (product.ImageURL) {
+        images.push(product.ImageURL);
       }
       
       // Return images if available
@@ -93,10 +98,10 @@ async function getProductImages(sku: string): Promise<string[]> {
       }
     }
     
-    // Fallback to placeholder if no images found
+    // No images found
     return [];
   } catch (error) {
-    // Fallback to placeholder on error
+    // Error fetching images
     return [];
   }
 }
@@ -908,8 +913,8 @@ app.get("/catalog", async (req, res) => {
                         ${product.imageUrl ? `
                             <img src="${product.imageUrl}" alt="${product.name}" class="product-image-real" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover; border: 2px solid #e2e8f0;" />
                         ` : `
-                            <div class="product-image">
-                                ${product.sku.substring(0, 2)}
+                            <div class="product-image" style="font-size: 10px; font-weight: bold; text-align: center; padding: 8px;">
+                                ${product.sku}
                             </div>
                         `}
                         <div class="product-info">
