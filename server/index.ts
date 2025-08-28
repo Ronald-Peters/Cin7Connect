@@ -48,8 +48,8 @@ app.use((req, res, next) => {
 const CORE_BASE_URL = process.env.CORE_BASE_URL || "https://inventory.dearsystems.com/ExternalApi";
 const CORE_HEADERS = () => ({
   "Content-Type": "application/json",
-  "api-auth-accountid": process.env.CIN7_ACCOUNT_ID,
-  "api-auth-applicationkey": process.env.CIN7_APP_KEY,
+  "api-auth-accountid": process.env.CIN7_ACCOUNT_ID || "",
+  "api-auth-applicationkey": process.env.CIN7_APP_KEY || "",
 });
 
 async function corePost(path: string, body: any) {
@@ -138,9 +138,9 @@ async function getProductImages(sku: string): Promise<string[]> {
                 const attachmentData = await attachmentResponse.json();
                 
                 // Parse attachment response for image files
-                let attachments = [];
-                if (attachmentData?.Attachments) {
-                  attachments = attachmentData.Attachments;
+                let attachments: any[] = [];
+                if ((attachmentData as any)?.Attachments) {
+                  attachments = (attachmentData as any).Attachments;
                 } else if (Array.isArray(attachmentData)) {
                   attachments = attachmentData;
                 }
@@ -170,8 +170,8 @@ async function getProductImages(sku: string): Promise<string[]> {
         } catch (attachmentError) {
           // Attachment endpoint might not be available or accessible, continue without images
           // Only log if it's not the common HTML error
-          if (!attachmentError.toString().includes('Unexpected token')) {
-            log(`Could not fetch attachments for ${sku}: ${attachmentError}`);
+          if (!String(attachmentError).includes('Unexpected token')) {
+            log(`Could not fetch attachments for ${sku}: ${String(attachmentError)}`);
           }
         }
       }
@@ -256,7 +256,7 @@ app.get("/api/products", async (req, res) => {
     const warehouseFilter = req.query.warehouse as string;
     
     // Fetch ALL availability data using pagination with no artificial limits
-    let allAvailabilityData = [];
+    let allAvailabilityData: any[] = [];
     let currentPage = 1;
     let totalFetched = 0;
     
@@ -265,9 +265,9 @@ app.get("/api/products", async (req, res) => {
       const pageData = await coreGet("/ProductAvailability", { 
         page: currentPage, 
         limit: 1000 
-      });
+      }) as any;
       
-      const pageRecords = pageData.ProductAvailability || [];
+      const pageRecords = (pageData as any).ProductAvailability || [];
       allAvailabilityData = allAvailabilityData.concat(pageRecords);
       totalFetched += pageRecords.length;
       
@@ -409,12 +409,12 @@ app.get("/api/products", async (req, res) => {
 app.get("/api/warehouses", async (req, res) => {
   try {
     log("Fetching filtered warehouses from Cin7 Locations...");
-    const data = await coreGet("/Locations", { page: 1, limit: 500 });
+    const data = await coreGet("/Locations", { page: 1, limit: 500 }) as any;
     log(`Cin7 Locations response: ${JSON.stringify(data).substring(0, 200)}...`);
     
     // Filter and group warehouses according to business requirements
     const allowedWarehouses = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"];
-    const locationsData = data.Locations || data.locations || data || [];
+    const locationsData = (data as any).Locations || (data as any).locations || data || [];
     
     // Filter to only allowed warehouse locations
     const filteredLocations = locationsData.filter((location: any) => 
@@ -462,11 +462,11 @@ app.get("/api/availability", async (req, res) => {
     const data = await coreGet("/ProductAvailability", { 
       page: 1, 
       limit: productSku ? 50 : 1000 
-    });
+    }) as any;
     
     // Filter to only allowed warehouse locations
     const allowedWarehouses = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"];
-    const availabilityArray = data.ProductAvailability || [];
+    const availabilityArray = (data as any).ProductAvailability || [];
     
     let filteredAvailability = availabilityArray.filter((item: any) => 
       allowedWarehouses.includes(item.Location)
@@ -737,7 +737,7 @@ app.get("/catalog", async (req, res) => {
     
     // Step 1: Fetch all stock data using pagination (1000 is the max per page)
     log("📦 Fetching stock availability data...");
-    let allAvailabilityData = [];
+    let allAvailabilityData: any[] = [];
     let currentPage = 1;
     let totalFetched = 0;
     
@@ -746,9 +746,9 @@ app.get("/catalog", async (req, res) => {
       const pageData = await coreGet("/ProductAvailability", { 
         page: currentPage, 
         limit: 1000 
-      });
+      }) as any;
       
-      const pageRecords = pageData.ProductAvailability || [];
+      const pageRecords = (pageData as any).ProductAvailability || [];
       allAvailabilityData = allAvailabilityData.concat(pageRecords);
       totalFetched += pageRecords.length;
       
@@ -771,7 +771,7 @@ app.get("/catalog", async (req, res) => {
     
     // Step 2: Fetch all product data with pricing information
     log("💰 Fetching product pricing data...");
-    let allProductData = [];
+    let allProductData: any[] = [];
     currentPage = 1;
     totalFetched = 0;
     
@@ -780,9 +780,9 @@ app.get("/catalog", async (req, res) => {
       const pageData = await coreGet("/Products", { 
         page: currentPage, 
         limit: 1000 
-      });
+      }) as any;
       
-      const pageRecords = pageData.Products || [];
+      const pageRecords = (pageData as any).Products || [];
       allProductData = allProductData.concat(pageRecords);
       totalFetched += pageRecords.length;
       
@@ -818,13 +818,13 @@ app.get("/catalog", async (req, res) => {
     log(`💰 PRICING MAP: ${pricingMap.size} products with pricing data`);
     
     // Analyze all unique locations in the complete dataset
-    const allLocations = [...new Set(allAvailabilityData.map((item: any) => item.Location))];
+    const allLocations = Array.from(new Set(allAvailabilityData.map((item: any) => item.Location)));
     log(`📍 ALL LOCATIONS found: ${allLocations.join(', ')}`);
     
     // Count records per location
-    const locationCounts = {};
+    const locationCounts: Record<string, number> = {};
     allAvailabilityData.forEach((item: any) => {
-      locationCounts[item.Location] = (locationCounts[item.Location] || 0) + 1;
+      locationCounts[item.Location as string] = (locationCounts[item.Location as string] || 0) + 1;
     });
     log(`📈 RECORDS PER LOCATION: ${JSON.stringify(locationCounts)}`);
     
@@ -837,7 +837,7 @@ app.get("/catalog", async (req, res) => {
     log(`✅ FILTERED to ${filteredAvailability.length} records from allowed warehouses`);
     
     // Count unique products
-    const uniqueProducts = [...new Set(filteredAvailability.map((item: any) => item.SKU))];
+    const uniqueProducts = Array.from(new Set(filteredAvailability.map((item: any) => item.SKU)));
     log(`🏷️  UNIQUE PRODUCTS: ${uniqueProducts.length} SKUs found`);
     
     // Verify pricing and category integration
@@ -846,11 +846,11 @@ app.get("/catalog", async (req, res) => {
       const samplePricing = pricingMap.get(sampleSku);
       
       // Count categories for verification (excluding Claims)
-      const categoryStats = {};
+      const categoryStats: Record<string, number> = {};
       Array.from(pricingMap.values()).forEach(product => {
         const cat = product.category || 'No Category';
         if (cat !== 'Claims') { // Exclude Claims from client catalog
-          categoryStats[cat] = (categoryStats[cat] || 0) + 1;
+          categoryStats[cat as string] = (categoryStats[cat as string] || 0) + 1;
         }
       });
       log(`📂 Categories loaded: ${Object.keys(categoryStats).length} customer categories from Cin7`);
@@ -1615,13 +1615,13 @@ app.post("/api/checkout", async (req, res) => {
     // Clear cart after successful order
     cartStore.clear();
     
-    log(`Successfully created unauthorized quote in Cin7. Quote ID: ${result.ID || 'Unknown'}`);
+    log(`Successfully created unauthorized quote in Cin7. Quote ID: ${(result as any).ID || 'Unknown'}`);
     
     res.json({
       success: true,
       message: "Order placed successfully as unauthorized quote in Cin7",
       orderReference,
-      cin7QuoteId: result.ID,
+      cin7QuoteId: (result as any).ID,
       items: cartItems.length,
       total: cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2),
       status: "UNAUTHORISED"
