@@ -618,16 +618,64 @@ app.get("/app", (req, res) => {
 app.get("/catalog", async (req, res) => {
   try {
     log("Loading live product catalog from Cin7...");
-    // Fetch comprehensive data to capture all 1000+ product lines across all warehouses
-    const data = await coreGet("/ProductAvailability", { page: 1, limit: 1000 });
     
-    const availabilityArray = data.ProductAvailability || [];
+    // Fetch all data using pagination (1000 is the max per page)
+    let allAvailabilityData = [];
+    let currentPage = 1;
+    let totalFetched = 0;
+    
+    do {
+      log(`Fetching page ${currentPage} (max 1000 records per page)...`);
+      const pageData = await coreGet("/ProductAvailability", { 
+        page: currentPage, 
+        limit: 1000 
+      });
+      
+      const pageRecords = pageData.ProductAvailability || [];
+      allAvailabilityData = allAvailabilityData.concat(pageRecords);
+      totalFetched += pageRecords.length;
+      
+      log(`📊 Page ${currentPage}: ${pageRecords.length} records (Total so far: ${totalFetched})`);
+      log(`📊 API Total Count: ${pageData.Total || 'not provided'}`);
+      
+      // Continue if we got a full page of 1000 records
+      if (pageRecords.length === 1000) {
+        currentPage++;
+      } else {
+        break;
+      }
+      
+      // Safety limit to prevent infinite loops
+      if (currentPage > 20) {
+        log(`⚠️ Reached safety limit of 20 pages (20,000 records)`);
+        break;
+      }
+    } while (true);
+    
+    log(`🎉 FINAL TOTAL: ${allAvailabilityData.length} records fetched from ${currentPage} pages`);
+    
+    // Analyze all unique locations in the complete dataset
+    const allLocations = [...new Set(allAvailabilityData.map((item: any) => item.Location))];
+    log(`📍 ALL LOCATIONS found: ${allLocations.join(', ')}`);
+    
+    // Count records per location
+    const locationCounts = {};
+    allAvailabilityData.forEach((item: any) => {
+      locationCounts[item.Location] = (locationCounts[item.Location] || 0) + 1;
+    });
+    log(`📈 RECORDS PER LOCATION: ${JSON.stringify(locationCounts)}`);
     
     // Filter to only allowed warehouse locations
     const allowedWarehouses = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"];
-    const filteredAvailability = availabilityArray.filter((item: any) => 
+    const filteredAvailability = allAvailabilityData.filter((item: any) => 
       allowedWarehouses.includes(item.Location)
     );
+    
+    log(`✅ FILTERED to ${filteredAvailability.length} records from allowed warehouses`);
+    
+    // Count unique products
+    const uniqueProducts = [...new Set(filteredAvailability.map((item: any) => item.SKU))];
+    log(`🏷️  UNIQUE PRODUCTS: ${uniqueProducts.length} SKUs found`);
     
     // Group stock by product and combine warehouse totals
     const productMap = new Map();
