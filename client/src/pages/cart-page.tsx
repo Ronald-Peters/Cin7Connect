@@ -186,10 +186,10 @@ export default function CartPage() {
                             </div>
                             <div className="text-right">
                               <p className="text-base font-semibold text-foreground" data-testid={`text-line-total-${index}`}>
-                                ${((item.price || 89.99) * item.quantity).toFixed(2)}
+                                R{((item.price || 89.99) * item.quantity).toFixed(2)}
                               </p>
                               <p className="text-sm text-muted-foreground" data-testid={`text-unit-price-${index}`}>
-                                ${(item.price || 89.99).toFixed(2)} each
+                                R{(item.price || 89.99).toFixed(2)} each
                               </p>
                             </div>
                             <Button
@@ -220,26 +220,26 @@ export default function CartPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span className="text-foreground" data-testid="text-subtotal">
-                      ${subtotal.toFixed(2)}
+                      R{subtotal.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax (8.5%)</span>
                     <span className="text-foreground" data-testid="text-tax">
-                      ${tax.toFixed(2)}
+                      R{tax.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Shipping</span>
                     <span className="text-foreground" data-testid="text-shipping">
-                      ${shipping.toFixed(2)}
+                      R{shipping.toFixed(2)}
                     </span>
                   </div>
                   <hr className="border-border" />
                   <div className="flex justify-between text-lg font-semibold">
                     <span className="text-foreground">Total</span>
                     <span className="text-foreground" data-testid="text-total">
-                      ${total.toFixed(2)}
+                      R{total.toFixed(2)}
                     </span>
                   </div>
                   

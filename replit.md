@@ -17,9 +17,11 @@ Production-ready B2B portal that integrates with Cin7 Core (DEAR) via API. Provi
 - Local caching for speed and resilience
 
 ## Recent Changes
-- Initial project setup with tech stack
-- Environment configuration for Cin7 API integration
-- Database schema for local caching
+- Complete Reivilo branding integration with royal blue color scheme
+- Currency standardized to South African Rand (ZAR) throughout system
+- Landing page updated to hide Cin7 references from customers
+- Multi-warehouse inventory messaging focused on Reivilo locations
+- Customer-specific pricing section removed per customer-facing requirements
 
 ## User Preferences
 - Follow the specified folder structure
