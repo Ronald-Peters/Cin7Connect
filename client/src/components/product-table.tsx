@@ -92,32 +92,14 @@ export function ProductTable() {
   const getWarehouseStock = (product: Product) => {
     const breakdown = product.warehouseBreakdown;
     return [
-      { 
-        warehouseId: 1,
-        warehouse: { id: 1, cin7LocationName: "JHB" },
-        available: breakdown.jhb.available.toString(), 
-        onHand: breakdown.jhb.onHand.toString(),
-        onOrder: breakdown.jhb.onOrder.toString()
-      },
-      { 
-        warehouseId: 2,
-        warehouse: { id: 2, cin7LocationName: "CPT" },
-        available: breakdown.cpt.available.toString(), 
-        onHand: breakdown.cpt.onHand.toString(),
-        onOrder: breakdown.cpt.onOrder.toString()
-      },
-      { 
-        warehouseId: 3,
-        warehouse: { id: 3, cin7LocationName: "BFN" },
-        available: breakdown.bfn.available.toString(), 
-        onHand: breakdown.bfn.onHand.toString(),
-        onOrder: breakdown.bfn.onOrder.toString()
-      },
-    ].filter(w => parseInt(w.available) > 0 || parseInt(w.onHand) > 0);
+      { warehouse: "JHB Warehouse", available: breakdown.jhb.available, onHand: breakdown.jhb.onHand },
+      { warehouse: "CPT Warehouse", available: breakdown.cpt.available, onHand: breakdown.cpt.onHand },
+      { warehouse: "BFN Warehouse", available: breakdown.bfn.available, onHand: breakdown.bfn.onHand },
+    ].filter(w => w.available > 0 || w.onHand > 0);
   };
 
   const handleAddToCart = (product: Product) => {
-    const warehouseName = selectedWarehouses[product.id] || "1";
+    const warehouseName = selectedWarehouses[product.id];
     const quantity = quantities[product.id] || 1;
     
     if (!warehouseName) return;
@@ -130,9 +112,8 @@ export function ProductTable() {
     });
   };
 
-  const canAddToCart = (productId: number) => {
-    const product = products?.products.find(p => p.id === productId);
-    return selectedWarehouses[productId] && product && getTotalStock(product) > 0;
+  const canAddToCart = (product: Product) => {
+    return selectedWarehouses[product.id] && getTotalStock(product) > 0;
   };
 
   return (
@@ -291,7 +272,7 @@ export function ProductTable() {
                               value={selectedWarehouses[product.id]?.toString() || ""}
                               onValueChange={(value) => setSelectedWarehouses({
                                 ...selectedWarehouses,
-                                [product.id]: value
+                                [product.id]: parseInt(value)
                               })}
                               data-testid={`select-warehouse-${product.id}`}
                             >
@@ -349,11 +330,36 @@ export function ProductTable() {
             </table>
           </div>
           
-          {/* Product Count */}
-          {products && (
+          {/* Pagination */}
+          {products && products.totalPages > 1 && (
             <div className="px-6 py-4 border-t border-border bg-muted/30">
-              <div className="text-sm text-muted-foreground" data-testid="text-pagination-info">
-                Showing {products.total} products total
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground" data-testid="text-pagination-info">
+                  Showing {((products.page - 1) * products.pageSize) + 1} to {Math.min(products.page * products.pageSize, products.total)} of {products.total} products
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(page - 1)}
+                    disabled={page <= 1}
+                    data-testid="button-previous-page"
+                  >
+                    Previous
+                  </Button>
+                  <span className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm" data-testid="text-current-page">
+                    {products.page}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(page + 1)}
+                    disabled={page >= products.totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             </div>
           )}

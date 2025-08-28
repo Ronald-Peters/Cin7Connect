@@ -1,9 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
-import fs from "fs";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
-import { setupAuth } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -15,9 +13,6 @@ function log(message: string) {
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Setup authentication
-setupAuth(app);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -204,73 +199,6 @@ function getProductImageUrl(sku: string, productName: string): string {
   return `https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=${encodeURIComponent(sku)}`;
 }
 
-// Fallback products when API is rate limited
-function generateFallbackProducts() {
-  log("🔄 Generating fallback product data due to rate limit");
-  const fallbackProducts = [
-    {
-      id: 1,
-      sku: "A0601",
-      name: "Agri Tire F-2 Tractor Front 6.00-16",
-      description: "F-2 / Tractor Front",
-      price: 2850.00,
-      currency: "ZAR",
-      available: 12,
-      onHand: 15,
-      onOrder: 5,
-      warehouseBreakdown: {
-        jhb: { available: 8, onHand: 10, onOrder: 3 },
-        cpt: { available: 4, onHand: 5, onOrder: 2 },
-        bfn: { available: 0, onHand: 0, onOrder: 0 }
-      },
-      imageUrl: "https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=A0601",
-      images: []
-    },
-    {
-      id: 2,
-      sku: "A0343",
-      name: "Agri Bias Tire 11.2-24",
-      description: "Agri Bias",
-      price: 4250.00,
-      currency: "ZAR",
-      available: 8,
-      onHand: 12,
-      onOrder: 3,
-      warehouseBreakdown: {
-        jhb: { available: 5, onHand: 8, onOrder: 2 },
-        cpt: { available: 3, onHand: 4, onOrder: 1 },
-        bfn: { available: 0, onHand: 0, onOrder: 0 }
-      },
-      imageUrl: "https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=A0343",
-      images: []
-    },
-    {
-      id: 3,
-      sku: "ATV0001",
-      name: "ATV Tire 25x8-12",
-      description: "ATV Tyres",
-      price: 1850.00,
-      currency: "ZAR",
-      available: 15,
-      onHand: 20,
-      onOrder: 8,
-      warehouseBreakdown: {
-        jhb: { available: 10, onHand: 12, onOrder: 5 },
-        cpt: { available: 5, onHand: 8, onOrder: 3 },
-        bfn: { available: 0, onHand: 0, onOrder: 0 }
-      },
-      imageUrl: "https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=ATV0001",
-      images: []
-    }
-  ];
-  
-  return {
-    products: fallbackProducts,
-    total: fallbackProducts.length,
-    filteredWarehouses: ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"]
-  };
-}
-
 /**
  * Helper to call Cin7 Core endpoints with simple error handling + pagination support.
  */
@@ -320,48 +248,43 @@ app.get("/api/user", (req, res) => {
   });
 });
 
-// Simple in-memory cache for products
-let productsCache: any = null;
-let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
 app.get("/api/products", async (req, res) => {
   try {
-    // Check cache first to reduce API calls
-    const now = Date.now();
-    if (productsCache && (now - cacheTimestamp) < CACHE_DURATION) {
-      log("📦 Serving cached products data");
-      return res.json(productsCache);
-    }
-
     log("Fetching products from Cin7 ProductAvailability (filtered warehouses)...");
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 1000;
     const warehouseFilter = req.query.warehouse as string;
     
-    // Fetch only first page to avoid rate limiting
+    // Fetch ALL availability data using pagination with no artificial limits
     let allAvailabilityData: any[] = [];
+    let currentPage = 1;
     let totalFetched = 0;
     
-    try {
-      log(`Fetching availability page 1 (limiting to avoid rate limits)...`);
+    do {
+      log(`Fetching availability page ${currentPage} (max 1000 per page due to Cin7 API limit)...`);
       const pageData = await coreGet("/ProductAvailability", { 
-        page: 1, 
-        limit: 100 // Reduced limit to avoid rate limiting
+        page: currentPage, 
+        limit: 1000 
       }) as any;
       
       const pageRecords = (pageData as any).ProductAvailability || [];
-      allAvailabilityData = pageRecords;
-      totalFetched = pageRecords.length;
+      allAvailabilityData = allAvailabilityData.concat(pageRecords);
+      totalFetched += pageRecords.length;
       
-      log(`📊 Page 1: ${pageRecords.length} records (Total: ${totalFetched})`);
-    } catch (apiError: any) {
-      if (apiError.message.includes('60 calls per 60 seconds')) {
-        log("⚠️ Rate limit hit - serving fallback data");
-        return res.json(generateFallbackProducts());
+      log(`📊 Page ${currentPage}: ${pageRecords.length} records (Total: ${totalFetched})`);
+      
+      // Continue if we got a full page
+      if (pageRecords.length === 1000) {
+        currentPage++;
+      } else {
+        break;
       }
-      throw apiError;
-    }
+      
+      // Continue pagination indefinitely until we get ALL data
+      if (currentPage > 100) {
+        log(`📈 Large dataset: page ${currentPage} - continuing to fetch ALL data...`);
+      }
+    } while (true);
     
     const data = { ProductAvailability: allAvailabilityData, Total: totalFetched };
     log(`Cin7 ProductAvailability response: ${JSON.stringify(data).substring(0, 200)}...`);
@@ -444,41 +367,38 @@ app.get("/api/products", async (req, res) => {
     // Convert map to array and format for frontend - now with real Cin7 images and categories
     const products = await Promise.all(
       Array.from(productMap.values()).map(async (item: any, index: number) => {
-        // Skip image fetching to reduce API calls when rate limited
-        const primaryImage = getProductImageUrl(item.sku, item.name);
+        // Fetch real product images from Cin7
+        const images = await getProductImages(item.sku);
+        const primaryImage = images.length > 0 ? images[0] : getProductImageUrl(item.sku, item.name);
         
         // Get real category from Cin7 product details
         const productDetail = productDetails.get(item.sku);
         const categoryName = productDetail?.Category || 'Tire Product';
+        log(`Final category for ${item.sku}: "${categoryName}" (productDetail: ${JSON.stringify(productDetail)})`);
         
         return {
           id: index + 1,
           sku: item.sku || `REI00${index + 1}`,
           name: item.name || `Product ${index + 1}`,
           description: item.description || item.category || 'Agriculture Tire',
-          price: item.price || 0,
+          price: item.price || 0, // Real pricing from Cin7
           currency: "ZAR",
           available: item.available,
           onHand: item.onHand,
           onOrder: item.onOrder,
           warehouseBreakdown: item.warehouseBreakdown,
+          // Real product images from Cin7 Core
           imageUrl: primaryImage,
-          images: []
+          images: images // Additional product images
         };
       })
     );
     
-    const result = {
+    res.json({
       products,
       total: products.length,
       filteredWarehouses: allowedWarehouses
-    };
-    
-    // Cache the successful result
-    productsCache = result;
-    cacheTimestamp = Date.now();
-    
-    res.json(result);
+    });
     log(`Successfully returned ${products.length} products with filtered warehouse stock from ${filteredAvailability.length} availability records`);
   } catch (error: any) {
     log(`Error fetching products: ${error.message}`);
@@ -1720,45 +1640,20 @@ app.post("/api/checkout", async (req, res) => {
 // Serve static assets including logo
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
-// Check if React app is available for deployment
-const reactAppPath = path.resolve(__dirname, "public");
-const reactIndexPath = path.join(reactAppPath, "index.html");
-const reactAppExists = fs.existsSync(reactIndexPath);
+// Serve demo page as default
+app.get("/", (req, res) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.sendFile(path.resolve(__dirname, "../client/demo.html"));
+});
 
-if (reactAppExists) {
-  // Deployment: Serve the built React app
-  log(`🗂️ Serving React app from: ${reactAppPath}`);
-  app.use(express.static(reactAppPath));
-  
-  // Serve React app for all non-API routes  
-  app.get("*", (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/app')) {
-      log(`📄 Serving React app for route: ${req.path}`);
-      res.sendFile(reactIndexPath);
-    } else if (req.path.startsWith('/api')) {
-      res.status(404).send('API route not found');
-    }
-  });
-} else {
-  // Development: Fallback message if React app not found
-  log(`⚠️ React app not found - deployment may be incomplete`);
-  app.get("*", (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/app')) {
-      res.status(503).send(`
-        <html>
-          <head><title>Reivilo B2B Portal</title></head>
-          <body style="font-family: Arial; text-align: center; padding: 50px;">
-            <h1>React App Loading...</h1>
-            <p>The React application is being deployed. Please refresh in a moment.</p>
-            <p>If this message persists, the build may be incomplete.</p>
-          </body>
-        </html>
-      `);
-    } else if (req.path.startsWith('/api')) {
-      res.status(404).send('API route not found');
-    }
-  });
-}
+// Catch all handler for client-side routing
+app.get("*", (req, res) => {
+  if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+    res.sendFile(path.resolve(__dirname, "../client/demo.html"));
+  } else {
+    res.status(404).send('Not found');
+  }
+});
 
 const port = parseInt(process.env.PORT || '5000', 10);
 app.listen(port, "0.0.0.0", () => {

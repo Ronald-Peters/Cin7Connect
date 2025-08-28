@@ -1,10 +1,9 @@
 {
   "name": "reivilo-b2b-server",
   "version": "1.0.0",
-  "type": "module",
   "description": "B2B Portal Server with Cin7 Integration",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "echo 'Start handled by root package.json'"
   }
 }

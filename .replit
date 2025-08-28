@@ -40,11 +40,3 @@ integrations = ["javascript_auth_all_persistance==1.0.0", "javascript_database==
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 5001
-externalPort = 3000
-
-[[ports]]
-localPort = 5002
-externalPort = 3001
