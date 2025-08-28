@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Cin7Service } from './services/cin7.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -43,49 +44,58 @@ app.use((req, res, next) => {
   next();
 });
 
-// Demo API routes with Reivilo branding
+// Initialize Cin7 service with credentials
+const cin7 = new Cin7Service({
+  baseURL: 'https://inventory.cin7.com/api/v1',
+  accountId: process.env.CIN7_ACCOUNT_ID!,
+  appKey: process.env.CIN7_APP_KEY!
+});
+
+// Live API routes connecting to Cin7
 app.get("/api/user", (req, res) => {
   res.json({ id: 1, username: "demo", companyName: "Demo Company" });
 });
 
-app.get("/api/products", (req, res) => {
-  res.json({
-    products: [
-      {
-        id: 1,
-        sku: "REI001",
-        name: "Premium Business Solution",
-        description: "A high-quality business solution from Reivilo - 45 years of excellence",
-        price: 299.99,
-        currency: "ZAR"
-      },
-      {
-        id: 2,
-        sku: "REI002", 
-        name: "Enterprise Package",
-        description: "Comprehensive enterprise solution with family business values since 1980",
-        price: 599.99,
-        currency: "ZAR"
-      },
-      {
-        id: 3,
-        sku: "REI003",
-        name: "Professional Service",
-        description: "Professional grade service with Reivilo's proven track record",
-        price: 199.99,
-        currency: "ZAR"
-      }
-    ],
-    total: 3
-  });
+app.get("/api/products", async (req, res) => {
+  try {
+    log("Fetching products from Cin7...");
+    const products = await cin7.getProducts();
+    const processedProducts = products.slice(0, 10).map((product: any, index: number) => ({
+      id: index + 1,
+      sku: product.SKU || `REI00${index + 1}`,
+      name: product.Name || `Product ${index + 1}`,
+      description: `${product.Name || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
+      price: 299.99, // Pricing would come from Cin7 price tiers
+      currency: "ZAR"
+    }));
+    
+    res.json({
+      products: processedProducts,
+      total: processedProducts.length
+    });
+    log(`Successfully returned ${processedProducts.length} products from Cin7`);
+  } catch (error: any) {
+    log(`Error fetching products: ${error.message}`);
+    res.status(500).json({ error: "Failed to fetch products from inventory system" });
+  }
 });
 
-app.get("/api/warehouses", (req, res) => {
-  res.json([
-    { id: 1, name: "Cape Town Main", location: "Cape Town" },
-    { id: 2, name: "Johannesburg Branch", location: "Johannesburg" },
-    { id: 3, name: "Durban Facility", location: "Durban" }
-  ]);
+app.get("/api/warehouses", async (req, res) => {
+  try {
+    log("Fetching warehouses from Cin7...");
+    const locations = await cin7.getLocations();
+    const warehouses = locations.map((location: any, index: number) => ({
+      id: index + 1,
+      name: location.Name || location.LocationName || `Location ${index + 1}`,
+      location: location.Name || location.LocationName || "Unknown"
+    }));
+    
+    res.json(warehouses);
+    log(`Successfully returned ${warehouses.length} warehouses from Cin7`);
+  } catch (error: any) {
+    log(`Error fetching warehouses: ${error.message}`);
+    res.status(500).json({ error: "Failed to fetch warehouse locations" });
+  }
 });
 
 app.get("/api/availability", (req, res) => {
