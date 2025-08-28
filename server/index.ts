@@ -235,7 +235,7 @@ app.get("/api/products", async (req, res) => {
           sku: item.sku || `REI00${index + 1}`,
           name: item.name || `Product ${index + 1}`,
           description: `${item.name || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
-          price: 299.99, // Pricing would come from Cin7 price tiers
+          price: item.sellPrice || 299.99, // Real pricing from Cin7
           currency: "ZAR",
           available: item.available,
           onHand: item.onHand,
@@ -890,6 +890,16 @@ app.get("/catalog", async (req, res) => {
         <div class="page-header">
             <h1 class="page-title">Product Catalog</h1>
             <p class="page-subtitle">Real-time inventory across JHB, CPT & BFN warehouses</p>
+            <div style="margin-top: 2rem; display: flex; justify-content: center;">
+                <div style="position: relative; width: 100%; max-width: 500px;">
+                    <input type="text" id="productSearch" placeholder="Search products by name, description, or SKU..." 
+                           style="width: 100%; padding: 1rem 1rem 1rem 3rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s;" 
+                           onkeyup="filterProducts()" 
+                           onfocus="this.style.borderColor='#1e40af'" 
+                           onblur="this.style.borderColor='#e2e8f0'" />
+                    <span style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 1.2rem;">🔍</span>
+                </div>
+            </div>
         </div>
 
         <div class="stats-bar">
@@ -920,6 +930,10 @@ app.get("/catalog", async (req, res) => {
                         `}
                         <div class="product-info">
                             <h3>${product.name}</h3>
+                            <p style="color: #64748b; font-size: 0.9rem; margin: 0.5rem 0;">${product.description || 'Premium tire product'}</p>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: #1e40af; margin: 0.75rem 0;">
+                                ZAR ${product.price ? parseFloat(product.price).toFixed(2) : '0.00'}
+                            </div>
                             <div class="product-sku">SKU: ${product.sku}</div>
                         </div>
                     </div>
@@ -1155,6 +1169,30 @@ app.get("/catalog", async (req, res) => {
                 alert('Error placing order. Please try again.');
             }
         });
+
+        // Search functionality
+        function filterProducts() {
+            const searchTerm = document.getElementById('productSearch').value.toLowerCase();
+            const productCards = document.querySelectorAll('.product-card');
+            let visibleCount = 0;
+            
+            productCards.forEach(card => {
+                const name = card.querySelector('h3').textContent.toLowerCase();
+                const sku = card.querySelector('.product-sku').textContent.toLowerCase();
+                const description = card.querySelector('p') ? card.querySelector('p').textContent.toLowerCase() : '';
+                
+                if (name.includes(searchTerm) || sku.includes(searchTerm) || description.includes(searchTerm)) {
+                    card.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            // Update stats
+            document.querySelector('.stat-number').textContent = visibleCount;
+            document.querySelector('.stat-label').textContent = visibleCount === 1 ? 'Product Found' : 'Products Found';
+        }
 
         // Load cart on page load
         loadCart();
