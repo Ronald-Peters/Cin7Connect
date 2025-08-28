@@ -224,20 +224,6 @@ app.get("/api/products", async (req, res) => {
       }
     });
     
-    // Get full product details including categories for the first 10 products
-    const productSkus = Array.from(productMap.keys()).slice(0, 10);
-    const productDetails = await Promise.all(
-      productSkus.map(async (sku: string) => {
-        try {
-          const productResponse = await coreGet('/Products', { qs: { sku } });
-          return productResponse.length > 0 ? productResponse[0] : null;
-        } catch (error) {
-          log(`Failed to fetch product details for ${sku}: ${error}`);
-          return null;
-        }
-      })
-    );
-
     // Convert map to array and format for frontend - now with real Cin7 images and categories
     const products = await Promise.all(
       Array.from(productMap.values()).slice(0, 10).map(async (item: any, index: number) => {
@@ -245,9 +231,24 @@ app.get("/api/products", async (req, res) => {
         const images = await getProductImages(item.sku);
         const primaryImage = images.length > 0 ? images[0] : getProductImageUrl(item.sku, item.name);
         
-        // Get detailed product info including category
-        const productDetail = productDetails[index];
-        const categoryName = productDetail?.Category || productDetail?.CategoryName || 'Tire Product';
+        // Determine category from product name/SKU patterns
+        let categoryName = 'Tire Product';
+        const name = item.name?.toLowerCase() || '';
+        const sku = item.sku?.toLowerCase() || '';
+        
+        if (name.includes('atv') || sku.includes('atv')) {
+          categoryName = 'ATV Tyres';
+        } else if (name.includes('tt') || name.includes('tractor') || name.includes('tube type')) {
+          categoryName = 'TT Tyres';
+        } else if (name.includes('fs') || sku.includes('fs')) {
+          categoryName = 'Flap & Tube';
+        } else if (name.includes('passenger') || name.includes('car')) {
+          categoryName = 'Passenger Tyres';
+        } else if (name.includes('truck') || name.includes('commercial')) {
+          categoryName = 'Commercial Tyres';
+        } else if (name.includes('bias') || name.includes('radial')) {
+          categoryName = 'Bias Tyres';
+        }
         
         return {
           id: index + 1,
