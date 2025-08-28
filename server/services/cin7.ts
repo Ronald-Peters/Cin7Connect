@@ -70,7 +70,7 @@ export class Cin7Service {
 
   constructor() {
     this.config = {
-      baseURL: process.env.CIN7_BASE_URL || 'https://inventory.dearsystems.com/externalapi/v2',
+      baseURL: process.env.CIN7_BASE_URL || 'https://inventory.cin7.com/api/v1',
       accountId: process.env.CIN7_ACCOUNT_ID || '',
       appKey: process.env.CIN7_APP_KEY || '',
     };

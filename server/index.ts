@@ -44,12 +44,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize Cin7 service with credentials
-const cin7 = new Cin7Service({
-  baseURL: 'https://inventory.cin7.com/api/v1',
-  accountId: process.env.CIN7_ACCOUNT_ID!,
-  appKey: process.env.CIN7_APP_KEY!
-});
+// Initialize Cin7 service (credentials come from environment variables)
+const cin7 = new Cin7Service();
 
 // Live API routes connecting to Cin7
 app.get("/api/user", (req, res) => {
@@ -60,18 +56,10 @@ app.get("/api/products", async (req, res) => {
   try {
     log("Fetching products from Cin7...");
     const response = await cin7.getProducts();
-    log(`Cin7 products response: ${JSON.stringify(response).substring(0, 200)}...`);
+    log(`Cin7 products response structure: ${typeof response}, keys: ${Object.keys(response || {})}`);
     
-    // Handle different response formats from Cin7
-    let productsArray = [];
-    if (Array.isArray(response)) {
-      productsArray = response;
-    } else if (response && response.data && Array.isArray(response.data)) {
-      productsArray = response.data;
-    } else if (response && typeof response === 'object') {
-      // If it's a single product, wrap in array
-      productsArray = [response];
-    }
+    // The getProducts method returns { data: [], pagination: {} }
+    const productsArray = response?.data || [];
     
     const processedProducts = productsArray.slice(0, 10).map((product: any, index: number) => ({
       id: index + 1,
@@ -96,19 +84,8 @@ app.get("/api/products", async (req, res) => {
 app.get("/api/warehouses", async (req, res) => {
   try {
     log("Fetching warehouses from Cin7...");
-    const response = await cin7.getLocations();
-    log(`Cin7 locations response: ${JSON.stringify(response).substring(0, 200)}...`);
-    
-    // Handle different response formats from Cin7
-    let locationsArray = [];
-    if (Array.isArray(response)) {
-      locationsArray = response;
-    } else if (response && response.data && Array.isArray(response.data)) {
-      locationsArray = response.data;
-    } else if (response && typeof response === 'object') {
-      // If it's a single location, wrap in array
-      locationsArray = [response];
-    }
+    const locationsArray = await cin7.getLocations();
+    log(`Cin7 locations response: ${locationsArray.length} locations found`);
     
     const warehouses = locationsArray.map((location: any, index: number) => ({
       id: index + 1,
