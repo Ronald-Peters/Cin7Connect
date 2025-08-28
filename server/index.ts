@@ -730,9 +730,21 @@ app.get("/app", (req, res) => {
   `);
 });
 
+// Simple cache for catalog data to prevent API rate limiting
+let catalogCache: any = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 300000; // 5 minutes
+
 // Product catalog interface showing live Cin7 data
 app.get("/catalog", async (req, res) => {
   try {
+    // Check cache first to avoid rate limiting
+    const now = Date.now();
+    if (catalogCache && (now - cacheTimestamp < CACHE_DURATION)) {
+      log("📋 Serving cached catalog data to avoid rate limiting");
+      return res.send(catalogCache);
+    }
+
     log("Loading live product catalog from Cin7...");
     
     // Step 1: Fetch all stock data using pagination (1000 is the max per page)
@@ -967,8 +979,7 @@ app.get("/catalog", async (req, res) => {
     
     const products = productsWithImages;
     
-    res.setHeader('Content-Type', 'text/html');
-    res.send(`
+    const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1505,12 +1516,43 @@ app.get("/catalog", async (req, res) => {
     </script>
 </body>
 </html>
-    `);
+    `;
+    
+    // Cache the response for 5 minutes to prevent rate limiting
+    catalogCache = htmlContent;
+    cacheTimestamp = Date.now();
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.send(htmlContent);
     
     log(`Successfully generated product catalog with ${products.length} live products`);
   } catch (error: any) {
     log(`Error generating catalog: ${error.message}`);
-    res.status(500).send("Error loading product catalog");
+    
+    // If we have cached data and we're getting rate limited, serve cached version
+    if (error.message.includes('API limit') && catalogCache) {
+      log("📋 Serving cached data due to API rate limiting");
+      return res.send(catalogCache);
+    }
+    
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Error - Reivilo B2B Portal</title></head>
+      <body style="font-family: Arial, sans-serif; text-align: center; padding: 2rem; background: #f8fafc;">
+        <div style="max-width: 500px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          <h1 style="color: #dc2626; margin-bottom: 1rem;">Service Temporarily Unavailable</h1>
+          <p style="color: #64748b; margin-bottom: 1rem;">
+            We're experiencing high demand. Please try again in a few minutes.
+          </p>
+          <p style="color: #64748b; font-size: 0.9rem;">
+            Our inventory system is processing multiple requests. 
+            <a href="/catalog" style="color: #1e40af;">Refresh</a> to try again.
+          </p>
+        </div>
+      </body>
+      </html>
+    `);
   }
 });
 
