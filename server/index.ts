@@ -1447,21 +1447,75 @@ app.post("/api/checkout", async (req, res) => {
 // Serve static assets including logo
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
-// Serve React app by redirecting to the demo page temporarily
-app.get("/", (req, res) => {
-  res.redirect("/app");
-});
+// Serve built React application
+app.use(express.static(path.resolve(__dirname, "../dist/public")));
 
-// Serve the demo React testing page  
-app.get("/demo", (req, res) => {
-  res.setHeader('Content-Type', 'text/html');
-  res.sendFile(path.resolve(__dirname, "../client/demo.html"));
-});
-
-// Catch all handler for client-side routing
+// Serve React app at root and handle client-side routing
 app.get("*", (req, res) => {
   if (!req.path.startsWith('/api') && !req.path.includes('.')) {
-    res.redirect("/app");
+    res.sendFile(path.resolve(__dirname, "../dist/public/index.html"));
+  } else if (req.path === "/app") {
+    // Keep the test page available at /app
+    res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Reivilo B2B Portal - Test Application</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .header { background: #1E3A8A; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .api-test { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px; }
+    .product { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    button { background: #1E3A8A; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏆 Reivilo B2B Portal - Test Environment</h1>
+      <p>45 Years of Family Business Values Since 1980</p>
+    </div>
+    
+    <div class="api-test">
+      <h2>API Testing Dashboard</h2>
+      <button onclick="testProducts()">Test Products API</button>
+      <button onclick="testWarehouses()">Test Warehouses API</button>
+      <button onclick="testUser()">Test User API</button>
+      <button onclick="testCart()">Test Cart API</button>
+      <a href="/" style="margin-left: 20px; color: #1E3A8A; text-decoration: none; font-weight: bold;">← Back to B2B Portal</a>
+    </div>
+    
+    <div id="results"></div>
+  </div>
+
+  <script>
+    async function testAPI(endpoint, title) {
+      try {
+        const response = await fetch('/api' + endpoint);
+        const data = await response.json();
+        displayResults(title, data);
+      } catch (error) {
+        displayResults(title + ' (Error)', { error: error.message });
+      }
+    }
+    
+    function testProducts() { testAPI('/products', 'Products'); }
+    function testWarehouses() { testAPI('/warehouses', 'Warehouses'); }
+    function testUser() { testAPI('/user', 'User'); }
+    function testCart() { testAPI('/cart', 'Cart'); }
+    
+    function displayResults(title, data) {
+      const results = document.getElementById('results');
+      const div = document.createElement('div');
+      div.className = 'api-test';
+      div.innerHTML = '<h3>' + title + '</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      results.appendChild(div);
+    }
+  </script>
+</body>
+</html>
+    `);
   } else {
     res.status(404).send('Not found');
   }
