@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Package, FileText, User, LogOut, Shield } from "lucide-react";
+import { ShoppingCart, Package, FileText, User, LogOut, Shield, Home } from "lucide-react";
 
 export function Header() {
   const [location, setLocation] = useLocation();
@@ -20,6 +20,7 @@ export function Header() {
   };
 
   const navItems = [
+    { path: "/", label: "Home", icon: Home },
     { path: "/catalog", label: "Catalog", icon: Package },
     { path: "/cart", label: "Cart", icon: ShoppingCart },
     { path: "/profile", label: "Profile", icon: User },
@@ -36,13 +37,17 @@ export function Header() {
                 src="/reivilo-logo.jpg" 
                 alt="Reivilo Logo" 
                 className="h-10 w-auto cursor-pointer"
-                onClick={() => setLocation("/catalog")}
+                onClick={() => setLocation("/")}
                 data-testid="img-logo"
+                onError={(e) => {
+                  console.log('Logo failed to load, using fallback');
+                  e.currentTarget.style.display = 'none';
+                }}
               />
               <div className="flex flex-col">
                 <h1 
                   className="text-lg font-bold text-primary cursor-pointer leading-tight" 
-                  onClick={() => setLocation("/catalog")}
+                  onClick={() => setLocation("/")}
                   data-testid="text-logo"
                 >
                   Reivilo B2B

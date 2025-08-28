@@ -143,7 +143,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Get unique SKUs from availability data
-      const uniqueSkus = [...new Set(allAvailability.map(item => item.SKU).filter(Boolean))];
+      const uniqueSkus = Array.from(new Set(allAvailability.map(item => item.SKU).filter(Boolean)));
       
       let synced = 0;
       let errors = 0;
@@ -157,7 +157,6 @@ export class DatabaseStorage implements IStorage {
           await this.upsertProduct({
             sku: sku,
             name: pricing?.name || sku,
-            description: pricing?.description || pricing?.name || sku,
             price: pricing?.price || 0,
             currency: 'ZAR',
             category: pricing?.category || 'General',
