@@ -8,6 +8,8 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "gce"
 build = ["sh", "-c", "npm install && npm run build && cp client/demo.html dist/public/ && cp -r attached_assets dist/"]
+
+run = ["sh", "-c", "NODE_ENV=production node dist/index.js"]
 run = ["sh", "-c", "NODE_ENV=production node dist/index.js"]
 run = ["sh", "-c", "node server/index.js"]
 
