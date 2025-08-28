@@ -33,7 +33,7 @@ export function Header() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
               <img 
-                src="@assets/150 x 68_1756418384700.jpg" 
+                src="/reivilo-logo.jpg" 
                 alt="Reivilo Logo" 
                 className="h-10 w-auto cursor-pointer"
                 onClick={() => setLocation("/catalog")}
