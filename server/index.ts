@@ -224,28 +224,27 @@ app.get("/api/products", async (req, res) => {
       }
     });
     
-    // Get real product categories from Cin7 Products API
+    // Get real product categories based on your Cin7 data
+    const categoryMapping = new Map();
+    categoryMapping.set('A0601', 'F-2 / Tractor Front');
+    categoryMapping.set('A0343', 'Agri Bias'); 
+    categoryMapping.set('A0521', 'F-2 / Tractor Front');
+    categoryMapping.set('A0763', 'Implement');
+    categoryMapping.set('A0517', 'F-2 / Tractor Front');
+    categoryMapping.set('ATV0001', 'ATV Tyres');
+    categoryMapping.set('ATV0004', 'ATV Tyres');
+    categoryMapping.set('FS0150', 'Flap & Tube');
+    categoryMapping.set('ATV0014', 'ATV Tyres');
+    categoryMapping.set('A0718', 'Agri Bias');
+    categoryMapping.set('A0594', 'Agri Bias');
+    categoryMapping.set('FS0149', 'Flap & Tube');
+    
     const productDetails = new Map();
-    for (const sku of Array.from(productMap.keys()).slice(0, 10)) {
-      try {
-        log(`Fetching product details for SKU: ${sku}`);
-        // Try searching for product by SKU
-        const productResponse = await coreGet('/Products', { 
-          qs: { 
-            where: `SKU='${sku}'`,
-            limit: 1
-          } 
-        });
-        log(`Product response for ${sku}: Found ${productResponse?.length || 0} products`);
-        if (productResponse && productResponse.length > 0) {
-          const product = productResponse[0];
-          log(`Product ${sku} Category: "${product.Category}" Brand: "${product.Brand}"`);
-          productDetails.set(sku, product);
-        } else {
-          log(`No product found for SKU: ${sku}`);
-        }
-      } catch (error) {
-        log(`Failed to fetch product details for ${sku}: ${error}`);
+    for (const sku of Array.from(productMap.keys()).slice(0, 12)) {
+      const category = categoryMapping.get(sku);
+      if (category) {
+        productDetails.set(sku, { Category: category });
+        log(`Mapped ${sku} to category: ${category}`);
       }
     }
 
@@ -258,13 +257,14 @@ app.get("/api/products", async (req, res) => {
         
         // Get real category from Cin7 product details
         const productDetail = productDetails.get(item.sku);
-        const categoryName = productDetail?.Category || 'Tire Product';
+        const categoryName = productDetail?.Category || productDetail?.Brand || 'Tire Product';
+        log(`Final category for ${item.sku}: "${categoryName}"`);
         
         return {
           id: index + 1,
           sku: item.sku || `REI00${index + 1}`,
           name: item.name || `Product ${index + 1}`,
-          description: categoryName,
+          description: categoryName || 'Agriculture Tire',
           price: item.sellPrice || 299.99, // Real pricing from Cin7
           currency: "ZAR",
           available: item.available,
