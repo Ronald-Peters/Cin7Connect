@@ -4,22 +4,6 @@
   "description": "B2B Portal Server with Cin7 Integration",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
-    "sync:availability": "node jobs/syncAvailability.js",
-    "sync:customers": "node jobs/syncCustomers.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "pg": "^8.11.3",
-    "axios": "^1.5.0",
-    "jsonwebtoken": "^9.0.2",
-    "bcrypt": "^5.1.1",
-    "pino": "^8.15.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "echo 'Start handled by root package.json'"
   }
 }
