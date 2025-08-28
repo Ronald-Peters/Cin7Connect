@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { Cin7Service } from './services/cin7.js';
+import fetch from "node-fetch";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -44,19 +44,41 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize Cin7 service (credentials come from environment variables)
-const cin7 = new Cin7Service();
+// ---------- Cin7 Core client ----------
+const CORE_BASE_URL = process.env.CORE_BASE_URL || "https://inventory.dearsystems.com/ExternalApi";
+const CORE_HEADERS = () => ({
+  "Content-Type": "application/json",
+  "api-auth-accountid": process.env.CIN7_ACCOUNT_ID,
+  "api-auth-applicationkey": process.env.CIN7_APP_KEY,
+});
+
+/**
+ * Helper to call Cin7 Core endpoints with simple error handling + pagination support.
+ */
+async function coreGet(path: string, { page = 1, limit, qs = {} }: { page?: number; limit?: number; qs?: Record<string, any> } = {}) {
+  const url = new URL(`${CORE_BASE_URL}${path}`);
+  if (page) url.searchParams.set("page", String(page));
+  if (limit) url.searchParams.set("limit", String(limit));
+  for (const [k, v] of Object.entries(qs)) if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+
+  const res = await fetch(url.toString(), { headers: CORE_HEADERS() });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Core GET ${url} failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
 
 // Test connection endpoint
 app.get("/api/test-connection", async (req, res) => {
   try {
     log("Testing Cin7 connection...");
-    log(`Using baseURL: ${process.env.CIN7_BASE_URL || 'https://inventory.cin7.com/api/v1'}`);
+    log(`Using baseURL: ${CORE_BASE_URL}`);
     log(`Account ID exists: ${!!process.env.CIN7_ACCOUNT_ID}`);
     log(`App Key exists: ${!!process.env.CIN7_APP_KEY}`);
     
-    const result = await cin7.testConnection();
-    res.json({ success: true, connected: result });
+    const result = await coreGet("/Locations", { page: 1, limit: 1 });
+    res.json({ success: true, connected: true, result });
   } catch (error: any) {
     log(`Connection test failed: ${error.message}`);
     res.status(500).json({ success: false, error: error.message });
@@ -70,27 +92,32 @@ app.get("/api/user", (req, res) => {
 
 app.get("/api/products", async (req, res) => {
   try {
-    log("Fetching products from Cin7...");
-    const response = await cin7.getProducts();
-    log(`Cin7 products response structure: ${typeof response}, keys: ${Object.keys(response || {})}`);
+    log("Fetching products from Cin7 ProductAvailability...");
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 50;
     
-    // The getProducts method returns { data: [], pagination: {} }
-    const productsArray = Array.isArray(response?.data) ? response.data : [];
+    const data = await coreGet("/ProductAvailability", { page, limit });
+    log(`Cin7 ProductAvailability response: ${JSON.stringify(data).substring(0, 200)}...`);
     
-    const processedProducts = productsArray.slice(0, 10).map((product: any, index: number) => ({
+    // Extract products from ProductAvailability response
+    const availabilityData = data.ProductAvailabilities || data.productAvailabilities || data || [];
+    const products = availabilityData.slice(0, 10).map((item: any, index: number) => ({
       id: index + 1,
-      sku: product.SKU || `REI00${index + 1}`,
-      name: product.Name || `Product ${index + 1}`,
-      description: `${product.Name || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
+      sku: item.SKU || `REI00${index + 1}`,
+      name: item.Name || item.ProductName || `Product ${index + 1}`,
+      description: `${item.Name || item.ProductName || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
       price: 299.99, // Pricing would come from Cin7 price tiers
-      currency: "ZAR"
+      currency: "ZAR",
+      available: item.Available || 0,
+      onHand: item.OnHand || 0,
+      onOrder: item.OnOrder || 0
     }));
     
     res.json({
-      products: processedProducts,
-      total: processedProducts.length
+      products,
+      total: products.length
     });
-    log(`Successfully returned ${processedProducts.length} products from Cin7`);
+    log(`Successfully returned ${products.length} products from Cin7`);
   } catch (error: any) {
     log(`Error fetching products: ${error.message}`);
     res.status(500).json({ error: "Failed to fetch products from inventory system" });
@@ -99,15 +126,13 @@ app.get("/api/products", async (req, res) => {
 
 app.get("/api/warehouses", async (req, res) => {
   try {
-    log("Fetching warehouses from Cin7...");
-    const locationsResponse = await cin7.getLocations();
-    log(`Cin7 locations response type: ${typeof locationsResponse}`);
+    log("Fetching warehouses from Cin7 Locations...");
+    const data = await coreGet("/Locations", { page: 1, limit: 500 });
+    log(`Cin7 Locations response: ${JSON.stringify(data).substring(0, 200)}...`);
     
-    // Handle the locations data correctly
-    const locationsArray = Array.isArray(locationsResponse) ? locationsResponse : [];
-    log(`Processing ${locationsArray.length} locations`);
-    
-    const warehouses = locationsArray.map((location: any, index: number) => ({
+    // Extract locations from response
+    const locationsData = data.Locations || data.locations || data || [];
+    const warehouses = locationsData.map((location: any, index: number) => ({
       id: index + 1,
       name: location.Name || location.LocationName || `Location ${index + 1}`,
       location: location.Name || location.LocationName || "Unknown"
