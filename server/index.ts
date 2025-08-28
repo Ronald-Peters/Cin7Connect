@@ -1897,6 +1897,39 @@ app.listen(port, "0.0.0.0", async () => {
   try {
     const result = await storage.syncCin7Products();
     log(`📦 Database sync complete: ${result.synced} products synced, ${result.errors} errors`);
+    
+    // Add sample products if none exist for demo purposes
+    if (result.synced === 0) {
+      try {
+        await storage.upsertProduct({
+          sku: 'TU0014',
+          name: '12.4-36 6PR TT FARM KING',
+          description: 'Agriculture Tire - 12.4-36 6PR TT FARM KING',
+          price: 4200.00,
+          currency: 'ZAR',
+          category: 'Agriculture Tire',
+          barcode: '',
+          brand: 'FARM KING',
+          imageUrl: null,
+          images: [],
+        });
+        await storage.upsertProduct({
+          sku: 'TU0154',
+          name: '16.9-34 8PR TT FARM KING',
+          description: 'Agriculture Tire - 16.9-34 8PR TT FARM KING',
+          price: 5800.00,
+          currency: 'ZAR',
+          category: 'Agriculture Tire',
+          barcode: '',
+          brand: 'FARM KING',
+          imageUrl: null,
+          images: [],
+        });
+        log(`📦 Added sample products for catalog demonstration`);
+      } catch (error) {
+        log(`❌ Error adding sample products: ${error}`);
+      }
+    }
   } catch (error) {
     log(`❌ Database sync failed: ${error}`);
   }

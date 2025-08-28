@@ -34,6 +34,17 @@ export function registerRoutes(app: Express): Server {
     res.json({ ok: true });
   });
 
+  // Manual product sync for testing
+  app.post("/api/products/sync", async (req, res) => {
+    try {
+      const result = await storage.syncCin7Products();
+      res.json(result);
+    } catch (error) {
+      console.error("Error syncing products:", error);
+      res.status(500).json({ message: "Failed to sync products" });
+    }
+  });
+
   // Warehouses
   app.get("/api/warehouses", async (req, res) => {
     try {

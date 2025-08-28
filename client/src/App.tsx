@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import HomePage from "@/pages/home-page";
+import CatalogPage from "@/pages/catalog-page";
 import AuthPage from "@/pages/auth-page";
 import AdminPage from "@/pages/admin-page";
 import CartPage from "@/pages/cart-page";
@@ -25,7 +26,7 @@ function App() {
       <AuthProvider>
         <Switch>
           <ProtectedRoute path="/" component={HomePage} />
-          <ProtectedRoute path="/catalog" component={HomePage} />
+          <ProtectedRoute path="/catalog" component={CatalogPage} />
           <Route path="/auth" component={AuthPage} />
           <Route path="/admin" component={AdminPage} />
           <ProtectedRoute path="/cart" component={CartPage} />
