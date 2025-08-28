@@ -191,6 +191,7 @@ app.get("/api/products", async (req, res) => {
         productMap.set(sku, {
           sku: sku,
           name: item.Name || item.ProductName,
+          category: item.Category || item.CategoryName || item.CategoryDescription || null,
           available: 0,
           onHand: 0,
           onOrder: 0,
@@ -223,18 +224,36 @@ app.get("/api/products", async (req, res) => {
       }
     });
     
-    // Convert map to array and format for frontend - now with real Cin7 images
+    // Get full product details including categories for the first 10 products
+    const productSkus = Array.from(productMap.keys()).slice(0, 10);
+    const productDetails = await Promise.all(
+      productSkus.map(async (sku: string) => {
+        try {
+          const productResponse = await coreGet('/Products', { qs: { sku } });
+          return productResponse.length > 0 ? productResponse[0] : null;
+        } catch (error) {
+          log(`Failed to fetch product details for ${sku}: ${error}`);
+          return null;
+        }
+      })
+    );
+
+    // Convert map to array and format for frontend - now with real Cin7 images and categories
     const products = await Promise.all(
       Array.from(productMap.values()).slice(0, 10).map(async (item: any, index: number) => {
         // Fetch real product images from Cin7
         const images = await getProductImages(item.sku);
         const primaryImage = images.length > 0 ? images[0] : getProductImageUrl(item.sku, item.name);
         
+        // Get detailed product info including category
+        const productDetail = productDetails[index];
+        const categoryName = productDetail?.Category || productDetail?.CategoryName || 'Tire Product';
+        
         return {
           id: index + 1,
           sku: item.sku || `REI00${index + 1}`,
           name: item.name || `Product ${index + 1}`,
-          description: item.category || item.CategoryName || 'Tire Product',
+          description: categoryName,
           price: item.sellPrice || 299.99, // Real pricing from Cin7
           currency: "ZAR",
           available: item.available,
