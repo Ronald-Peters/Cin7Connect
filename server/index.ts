@@ -1447,8 +1447,13 @@ app.post("/api/checkout", async (req, res) => {
 // Serve static assets including logo
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
-// Serve demo page as default
+// Serve React app by redirecting to the demo page temporarily
 app.get("/", (req, res) => {
+  res.redirect("/app");
+});
+
+// Serve the demo React testing page  
+app.get("/demo", (req, res) => {
   res.setHeader('Content-Type', 'text/html');
   res.sendFile(path.resolve(__dirname, "../client/demo.html"));
 });
@@ -1456,7 +1461,7 @@ app.get("/", (req, res) => {
 // Catch all handler for client-side routing
 app.get("*", (req, res) => {
   if (!req.path.startsWith('/api') && !req.path.includes('.')) {
-    res.sendFile(path.resolve(__dirname, "../client/demo.html"));
+    res.redirect("/app");
   } else {
     res.status(404).send('Not found');
   }
