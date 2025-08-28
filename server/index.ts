@@ -1686,12 +1686,78 @@ app.post("/api/checkout", async (req, res) => {
 // Serve static assets including logo
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
-// In production, serve built static files
-if (process.env.NODE_ENV === 'production') {
-  const publicPath = path.resolve(__dirname, "./public");
-  app.use(express.static(publicPath));
-  log(`📁 Serving static files from: ${publicPath}`);
-}
+// Serve built static files
+const publicPath = process.env.NODE_ENV === 'production' 
+  ? path.resolve(__dirname, "./public")
+  : path.resolve(__dirname, "../dist/public");
+app.use(express.static(publicPath));
+log(`📁 Serving static files from: ${publicPath}`);
+
+// Admin page route
+app.get("/admin", (req, res) => {
+  try {
+    const reactAppPath = process.env.NODE_ENV === 'production' 
+      ? path.resolve(__dirname, "./public/index.html")
+      : path.resolve(__dirname, "../dist/public/index.html");
+    
+    log(`🔐 Serving admin page from: ${reactAppPath}`);
+    res.sendFile(reactAppPath, (err) => {
+      if (err) {
+        log(`❌ Error serving admin: ${err.message}`);
+        res.status(500).send(`
+          <html><body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h2>🔐 Reivilo Admin Portal</h2>
+            <p>Admin System Loading...</p>
+            <p>If this persists, contact support.</p>
+          </body></html>
+        `);
+      }
+    });
+  } catch (error: any) {
+    log(`❌ Error in /admin route: ${error.message}`);
+    res.status(500).send('Admin system error');
+  }
+});
+
+// Sync customers from Cin7 endpoint
+app.post("/api/admin/sync-customers", async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    log(`🔄 Syncing customers from Cin7...`);
+    
+    // Fetch customers from Cin7
+    const customersData = await coreGet("/Customers", { page: 1, limit: 1000 });
+    const customers = (customersData as any).Customers || [];
+    
+    let syncedCount = 0;
+    for (const customer of customers) {
+      if (customer.ID && customer.Name) {
+        await storage.upsertCustomer({
+          erpCustomerId: customer.ID.toString(),
+          companyName: customer.Name,
+          terms: customer.Terms || '',
+          priceTier: customer.PriceTier || '',
+          defaultAddress: customer.DefaultAddress || '',
+          billingAddress: JSON.stringify(customer.BillingAddress || {}),
+          shippingAddress: JSON.stringify(customer.ShippingAddress || {}),
+          contacts: customer.Contacts || {},
+          syncedAt: new Date(),
+        });
+        syncedCount++;
+      }
+    }
+    
+    log(`✅ Synced ${syncedCount} customers from Cin7`);
+    res.json({ success: true, syncedCount, totalFetched: customers.length });
+    
+  } catch (error: any) {
+    log(`❌ Error syncing customers: ${error.message}`);
+    res.status(500).json({ message: "Failed to sync customers", error: error.message });
+  }
+});
 
 // Production-ready client access routes
 app.get("/login", (req, res) => {

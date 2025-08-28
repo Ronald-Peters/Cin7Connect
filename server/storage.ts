@@ -10,7 +10,11 @@ const PostgresSessionStore = connectPg(session);
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser & { customerId?: number }): Promise<User>;
+  createUser(user: InsertUser & { customerId?: number; role?: string; createdBy?: string }): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+  getAllActiveCustomers(): Promise<Customer[]>;
+  updateCustomer(id: number, updates: Partial<Customer>): Promise<Customer | undefined>;
+  syncCin7Customers(): Promise<void>;
   
   // Customer methods
   getCustomerById(id: number): Promise<Customer | undefined>;
@@ -59,16 +63,45 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async createUser(userData: InsertUser & { customerId?: number }): Promise<User> {
+  async createUser(userData: InsertUser & { customerId?: number; role?: string; createdBy?: string }): Promise<User> {
     const [user] = await db
       .insert(users)
       .values({
         email: userData.email,
         password: userData.password,
         customerId: userData.customerId,
+        role: userData.role || 'buyer',
+        createdBy: userData.createdBy,
       })
       .returning();
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async getAllActiveCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers).orderBy(asc(customers.companyName));
+  }
+
+  async updateCustomer(id: number, updates: Partial<Customer>): Promise<Customer | undefined> {
+    const [customer] = await db
+      .update(customers)
+      .set(updates)
+      .where(eq(customers.id, id))
+      .returning();
+    return customer || undefined;
+  }
+
+  async syncCin7Customers(): Promise<void> {
+    // This will be called from server to sync customers from Cin7
+    // Implementation will fetch all customers from Cin7 and upsert them
   }
 
   async getCustomerById(id: number): Promise<Customer | undefined> {

@@ -28,6 +28,26 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+// Create admin users if they don't exist
+async function createAdminUsers() {
+  const adminUsers = [
+    { email: "ronald@reiviloindustrial.co.za", password: "Ron@Reiv25" },
+    { email: "sales2@reiviloindustrial.co.za", password: "Kai@Reiv25" }
+  ];
+
+  for (const admin of adminUsers) {
+    const existingUser = await storage.getUserByEmail(admin.email);
+    if (!existingUser) {
+      await storage.createUser({
+        email: admin.email,
+        password: await hashPassword(admin.password),
+        role: 'admin',
+      });
+      console.log(`✅ Created admin user: ${admin.email}`);
+    }
+  }
+}
+
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || 'reivilo-b2b-secret-change-in-production',
@@ -48,6 +68,9 @@ export function setupAuth(app: Express) {
   app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
+  
+  // Create admin users on startup
+  createAdminUsers().catch(console.error);
 
   passport.use(
     new LocalStrategy(
@@ -77,12 +100,17 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/register", async (req, res, next) => {
+  // Admin-only client registration endpoint
+  app.post("/api/admin/create-client", async (req, res, next) => {
     try {
-      const { email, password } = req.body;
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { email, password, customerId } = req.body;
       
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
+      if (!email || !password || !customerId) {
+        return res.status(400).json({ message: "Email, password, and customer ID are required" });
       }
 
       const existingUser = await storage.getUserByEmail(email);
@@ -90,25 +118,31 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Email already registered" });
       }
 
-      // For now, create without customer association
-      // In production, you'd map to existing customers
       const user = await storage.createUser({
         email,
         password: await hashPassword(password),
+        customerId: parseInt(customerId),
+        role: 'buyer',
+        createdBy: req.user.id,
       });
 
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(201).json({
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          customerId: user.customerId,
-        });
+      res.status(201).json({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        customerId: user.customerId,
+        success: true,
       });
     } catch (error) {
       next(error);
     }
+  });
+
+  // Disable public registration - admin only
+  app.post("/api/register", async (req, res) => {
+    res.status(403).json({ 
+      message: "Registration is restricted. Please contact your administrator for access." 
+    });
   });
 
   app.post("/api/login", passport.authenticate("local"), async (req, res) => {
@@ -142,6 +176,44 @@ export function setupAuth(app: Express) {
       if (err) return next(err);
       res.sendStatus(200);
     });
+  });
+
+  // Admin routes
+  app.get("/api/admin/customers", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const customers = await storage.getAllActiveCustomers();
+      res.json(customers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+
+  app.post("/api/admin/customers/:id/activate", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { allowPortalAccess } = req.body;
+      const customerId = parseInt(req.params.id);
+      
+      const customer = await storage.updateCustomer(customerId, {
+        isActive: true,
+        allowPortalAccess: allowPortalAccess || false,
+      });
+      
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      
+      res.json(customer);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update customer" });
+    }
   });
 
   app.get("/api/user", async (req, res) => {

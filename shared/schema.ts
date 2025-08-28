@@ -9,8 +9,10 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   customerId: integer("customer_id").references(() => customers.id),
-  role: text("role").default("buyer"),
+  role: text("role").default("buyer"), // 'admin', 'buyer'
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
 });
 
 // Customers (cached from Cin7)
@@ -24,6 +26,9 @@ export const customers = pgTable("customers", {
   billingAddress: text("billing_address"),
   shippingAddress: text("shipping_address"),
   contacts: jsonb("contacts"),
+  isActive: boolean("is_active").default(false), // Admin must activate
+  allowPortalAccess: boolean("allow_portal_access").default(false),
+  syncedAt: timestamp("synced_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
