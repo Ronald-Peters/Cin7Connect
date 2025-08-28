@@ -64,7 +64,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(userData: InsertUser & { customerId?: number; role?: string; createdBy?: string }): Promise<User> {
-    const insertData = {
+    const insertData: any = {
       email: userData.email,
       password: userData.password,
       customerId: userData.customerId || null,
@@ -73,8 +73,8 @@ export class DatabaseStorage implements IStorage {
       isActive: true,
     };
     
-    const result = await db.insert(users).values(insertData).returning();
-    return result[0] as User;
+    const result: any = await db.insert(users).values(insertData).returning();
+    return result[0];
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
