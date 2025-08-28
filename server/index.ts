@@ -234,7 +234,7 @@ app.get("/api/products", async (req, res) => {
           id: index + 1,
           sku: item.sku || `REI00${index + 1}`,
           name: item.name || `Product ${index + 1}`,
-          description: `${item.name || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
+          description: item.category || item.CategoryName || 'Tire Product',
           price: item.sellPrice || 299.99, // Real pricing from Cin7
           currency: "ZAR",
           available: item.available,
@@ -930,7 +930,7 @@ app.get("/catalog", async (req, res) => {
                         `}
                         <div class="product-info">
                             <h3>${product.name}</h3>
-                            <p style="color: #64748b; font-size: 0.9rem; margin: 0.5rem 0;">${product.description || 'Premium tire product'}</p>
+                            <p style="color: #64748b; font-size: 0.9rem; margin: 0.5rem 0;">${product.description || 'Tire Product'}</p>
                             <div style="font-size: 1.25rem; font-weight: 700; color: #1e40af; margin: 0.75rem 0;">
                                 R ${product.price ? parseFloat(product.price).toFixed(2) : '0.00'}
                             </div>
