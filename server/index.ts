@@ -110,7 +110,18 @@ app.get("/api/test-connection", async (req, res) => {
 
 // Live API routes connecting to Cin7
 app.get("/api/user", (req, res) => {
-  res.json({ id: 1, username: "demo", companyName: "Demo Company" });
+  res.json({ 
+    id: 1, 
+    username: "demo", 
+    email: "demo@reivilo.co.za",
+    companyName: "Demo Company",
+    customer: {
+      id: 1,
+      companyName: "Demo Company",
+      priceTier: "Standard",
+      terms: "Net 30"
+    }
+  });
 });
 
 app.get("/api/products", async (req, res) => {

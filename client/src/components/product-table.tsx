@@ -12,65 +12,57 @@ interface Product {
   id: number;
   sku: string;
   name: string;
-  barcode: string;
-  brand: string;
+  description: string;
+  price: number;
+  currency: string;
+  available: number;
+  onHand: number;
+  onOrder: number;
   imageUrl: string;
+  images: string[];
+  warehouseBreakdown: {
+    jhb: { available: number; onHand: number; onOrder: number };
+    cpt: { available: number; onHand: number; onOrder: number };
+    bfn: { available: number; onHand: number; onOrder: number };
+  };
 }
 
-interface ProductAvailability {
-  productId: number;
-  warehouseId: number;
-  warehouse: {
-    id: number;
-    cin7LocationName: string;
-  };
-  available: string;
-  onHand: string;
-  onOrder: string;
+interface Warehouse {
+  id: number;
+  name: string;
+  location: string;
+  description: string;
+  internalLocations: string[];
 }
 
 interface ProductsResponse {
-  items: Product[];
-  availability: ProductAvailability[];
+  products: Product[];
   total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  filteredWarehouses: string[];
 }
 
 export function ProductTable() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [selectedWarehouses, setSelectedWarehouses] = useState<{ [key: number]: number }>({});
+  const [selectedWarehouses, setSelectedWarehouses] = useState<{ [key: number]: string }>({});
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({});
 
   const { data: products, isLoading: productsLoading } = useQuery<ProductsResponse>({
-    queryKey: ["/api/products", { q: search, page, pageSize: 10 }],
+    queryKey: ["/api/products"],
     enabled: true,
   });
 
-  const { data: warehouses } = useQuery({
+  const { data: warehouses } = useQuery<Warehouse[]>({
     queryKey: ["/api/warehouses"],
   });
 
   const addToCartMutation = useMutation({
     mutationFn: async (item: { sku: string; quantity: number; warehouse: string; productId: number }) => {
-      const currentCart = await queryClient.fetchQuery({
-        queryKey: ["/api/cart"],
-      }) as any;
-
-      const existingItems = currentCart?.items || [];
-      const newItem = {
+      const res = await apiRequest("POST", "/api/cart", {
         sku: item.sku,
         quantity: item.quantity,
         warehouse: item.warehouse,
-      };
-
-      const updatedItems = [...existingItems, newItem];
-
-      const res = await apiRequest("POST", "/api/cart", {
-        items: updatedItems,
-        location: item.warehouse,
+        productId: item.productId,
       });
       return res.json();
     },
@@ -79,48 +71,43 @@ export function ProductTable() {
     },
   });
 
-  const getStockIndicator = (productId: number) => {
-    if (!products?.availability) return "stock-none";
-    
-    const productAvailability = products.availability.filter(a => a.productId === productId);
-    const totalAvailable = productAvailability.reduce((sum, stock) => sum + parseFloat(stock.available), 0);
+  const getStockIndicator = (product: Product) => {
+    const totalAvailable = product.available;
     
     if (totalAvailable > 50) return "stock-high";
     if (totalAvailable > 0) return "stock-medium";
     return "stock-none";
   };
 
-  const getTotalStock = (productId: number) => {
-    if (!products?.availability) return 0;
-    
-    const productAvailability = products.availability.filter(a => a.productId === productId);
-    return productAvailability.reduce((sum, stock) => sum + parseFloat(stock.available), 0);
+  const getTotalStock = (product: Product) => {
+    return product.available;
   };
 
-  const getProductAvailability = (productId: number) => {
-    if (!products?.availability) return [];
-    return products.availability.filter(a => a.productId === productId);
+  const getWarehouseStock = (product: Product) => {
+    const breakdown = product.warehouseBreakdown;
+    return [
+      { warehouse: "JHB Warehouse", available: breakdown.jhb.available, onHand: breakdown.jhb.onHand },
+      { warehouse: "CPT Warehouse", available: breakdown.cpt.available, onHand: breakdown.cpt.onHand },
+      { warehouse: "BFN Warehouse", available: breakdown.bfn.available, onHand: breakdown.bfn.onHand },
+    ].filter(w => w.available > 0 || w.onHand > 0);
   };
 
   const handleAddToCart = (product: Product) => {
-    const warehouseId = selectedWarehouses[product.id];
+    const warehouseName = selectedWarehouses[product.id];
     const quantity = quantities[product.id] || 1;
     
-    if (!warehouseId) return;
-    
-    const warehouse = (warehouses as any)?.find((w: any) => w.id === warehouseId);
-    if (!warehouse) return;
+    if (!warehouseName) return;
 
     addToCartMutation.mutate({
       sku: product.sku,
       quantity,
-      warehouse: warehouse.name,
+      warehouse: warehouseName,
       productId: product.id,
     });
   };
 
-  const canAddToCart = (productId: number) => {
-    return selectedWarehouses[productId] && getTotalStock(productId) > 0;
+  const canAddToCart = (product: Product) => {
+    return selectedWarehouses[product.id] && getTotalStock(product) > 0;
   };
 
   return (
@@ -183,17 +170,17 @@ export function ProductTable() {
                       Loading products...
                     </td>
                   </tr>
-                ) : !products?.items?.length ? (
+                ) : !products?.products?.length ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
                       No products found
                     </td>
                   </tr>
                 ) : (
-                  products.items.map((product) => {
-                    const stockIndicator = getStockIndicator(product.id);
-                    const totalStock = getTotalStock(product.id);
-                    const availability = getProductAvailability(product.id);
+                  products.products.map((product) => {
+                    const stockIndicator = getStockIndicator(product);
+                    const totalStock = getTotalStock(product);
+                    const warehouseStock = getWarehouseStock(product);
 
                     return (
                       <tr key={product.id} className="hover:bg-muted/20 transition-colors" data-testid={`row-product-${product.id}`}>
