@@ -823,10 +823,6 @@ app.get("/catalog", async (req, res) => {
                 <div class="stat-label">Warehouse Regions</div>
             </div>
             <div class="stat">
-                <div class="stat-number">${products.reduce((sum, p) => sum + p.available, 0)}</div>
-                <div class="stat-label">Total Stock</div>
-            </div>
-            <div class="stat">
                 <div class="stat-number">ZAR</div>
                 <div class="stat-label">Pricing Currency</div>
             </div>
