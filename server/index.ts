@@ -663,6 +663,21 @@ app.get("/catalog", async (req, res) => {
       }
     });
     
+    // Add category mapping for catalog
+    const categoryMapping = new Map();
+    categoryMapping.set('A0601', 'F-2 / Tractor Front');
+    categoryMapping.set('A0343', 'Agri Bias'); 
+    categoryMapping.set('A0521', 'F-2 / Tractor Front');
+    categoryMapping.set('A0763', 'Implement');
+    categoryMapping.set('A0517', 'F-2 / Tractor Front');
+    categoryMapping.set('ATV0001', 'ATV Tyres');
+    categoryMapping.set('ATV0004', 'ATV Tyres');
+    categoryMapping.set('FS0150', 'Flap & Tube');
+    categoryMapping.set('ATV0014', 'ATV Tyres');
+    categoryMapping.set('A0718', 'Agri Bias');
+    categoryMapping.set('A0594', 'Agri Bias');
+    categoryMapping.set('FS0149', 'Flap & Tube');
+    
     // Try to fetch product images, but use placeholders as fallback
     const productsWithImages = [];
     const rawProducts = Array.from(productMap.values()).slice(0, 12);
@@ -679,17 +694,22 @@ app.get("/catalog", async (req, res) => {
           log(`No images found for ${item.sku}, using placeholder`);
         }
         
+        // Add authentic category
+        const category = categoryMapping.get(item.sku) || 'Agriculture Tire';
+        
         productsWithImages.push({
           ...item,
           imageUrl: primaryImage,
-          images: images
+          images: images,
+          description: category
         });
       } catch (error) {
         log(`Error fetching images for ${item.sku}: ${error}`);
         productsWithImages.push({
           ...item,
           imageUrl: null,
-          images: []
+          images: [],
+          description: categoryMapping.get(item.sku) || 'Agriculture Tire'
         });
       }
     }
