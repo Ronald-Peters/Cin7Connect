@@ -932,7 +932,7 @@ app.get("/catalog", async (req, res) => {
                             <h3>${product.name}</h3>
                             <p style="color: #64748b; font-size: 0.9rem; margin: 0.5rem 0;">${product.description || 'Premium tire product'}</p>
                             <div style="font-size: 1.25rem; font-weight: 700; color: #1e40af; margin: 0.75rem 0;">
-                                ZAR ${product.price ? parseFloat(product.price).toFixed(2) : '0.00'}
+                                R ${product.price ? parseFloat(product.price).toFixed(2) : '0.00'}
                             </div>
                             <div class="product-sku">SKU: ${product.sku}</div>
                         </div>
@@ -1086,7 +1086,7 @@ app.get("/catalog", async (req, res) => {
                         <small>\${item.warehouse} • Qty: \${item.quantity}</small>
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-weight: 600;">ZAR \${(item.price * item.quantity).toFixed(2)}</div>
+                        <div style="font-weight: 600;">R \${(item.price * item.quantity).toFixed(2)}</div>
                         <button onclick="removeFromCart('\${item.id}')" style="color: #dc2626; background: none; border: none; cursor: pointer; font-size: 0.8rem;">Remove</button>
                     </div>
                 </div>
@@ -1095,7 +1095,7 @@ app.get("/catalog", async (req, res) => {
             const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             cartTotal.innerHTML = \`
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="font-size: 1.2rem;">Total: ZAR \${total.toFixed(2)}</strong>
+                    <strong style="font-size: 1.2rem;">Total: R \${total.toFixed(2)}</strong>
                     <span style="color: #64748b;">(\${cart.length} items)</span>
                 </div>
             \`;
@@ -1157,7 +1157,7 @@ app.get("/catalog", async (req, res) => {
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('Order placed successfully!\\n\\nOrder Reference: ' + result.orderReference + '\\nCin7 Quote ID: ' + result.cin7QuoteId + '\\nTotal: ZAR ' + result.total + '\\n\\nYour order has been created as an unauthorized quote in Cin7.');
+                    alert('Order placed successfully!\\n\\nOrder Reference: ' + result.orderReference + '\\nCin7 Quote ID: ' + result.cin7QuoteId + '\\nTotal: R ' + result.total + '\\n\\nYour order has been created as an unauthorized quote in Cin7.');
                     closeCheckout();
                     closeCart();
                     cart = [];
