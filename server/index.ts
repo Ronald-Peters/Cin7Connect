@@ -726,11 +726,18 @@ app.get("/catalog", async (req, res) => {
     const uniqueProducts = [...new Set(filteredAvailability.map((item: any) => item.SKU))];
     log(`🏷️  UNIQUE PRODUCTS: ${uniqueProducts.length} SKUs found`);
     
-    // Sample pricing data to verify integration
+    // Verify pricing and category integration
     if (filteredAvailability.length > 0) {
       const sampleSku = filteredAvailability[0].SKU;
       const samplePricing = pricingMap.get(sampleSku);
-      log(`💰 SAMPLE PRICING for ${sampleSku}: R ${samplePricing?.price || 0} (${samplePricing?.category || 'No category'})`);
+      
+      // Count categories for verification
+      const categoryStats = {};
+      Array.from(pricingMap.values()).forEach(product => {
+        const cat = product.category || 'No Category';
+        categoryStats[cat] = (categoryStats[cat] || 0) + 1;
+      });
+      log(`📂 Categories loaded: ${Object.keys(categoryStats).length} categories from Cin7`);
     }
     
     // Group stock by product and combine warehouse totals
@@ -797,10 +804,7 @@ app.get("/catalog", async (req, res) => {
       .sort((a, b) => b.available - a.available)
       .slice(0, 12);
     
-    log(`Displaying ${selectedProducts.length} products sorted by stock levels for verification`);
-    selectedProducts.forEach(product => {
-      log(`${product.sku}: R ${product.price} | Total=${product.available}, JHB=${product.warehouseBreakdown.jhb.available}, CPT=${product.warehouseBreakdown.cpt.available}, BFN=${product.warehouseBreakdown.bfn.available}`);
-    });
+    log(`Displaying ${selectedProducts.length} products with pricing and categories for verification`);
     
     // Try to fetch product images, but use placeholders as fallback
     const productsWithImages = [];
@@ -818,14 +822,16 @@ app.get("/catalog", async (req, res) => {
           log(`No images found for ${item.sku}, using placeholder`);
         }
         
-        // Add authentic category
-        const category = categoryMapping.get(item.sku) || 'Agriculture Tire';
+        // Use real Cin7 category and description
+        const category = item.category || 'Agriculture Tire';
+        const description = item.description || category;
         
         productsWithImages.push({
           ...item,
           imageUrl: primaryImage,
           images: images,
-          description: category
+          category: category,
+          description: description
         });
       } catch (error) {
         log(`Error fetching images for ${item.sku}: ${error}`);
@@ -833,7 +839,8 @@ app.get("/catalog", async (req, res) => {
           ...item,
           imageUrl: null,
           images: [],
-          description: categoryMapping.get(item.sku) || 'Agriculture Tire'
+          category: item.category || 'Agriculture Tire',
+          description: item.description || item.category || 'Agriculture Tire'
         });
       }
     }
@@ -1104,7 +1111,12 @@ app.get("/catalog", async (req, res) => {
                         `}
                         <div class="product-info">
                             <h3>${product.name}</h3>
-                            <p style="color: #64748b; font-size: 0.9rem; margin: 0.5rem 0;">${product.description}</p>
+                            <div style="margin: 0.5rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="background: #1e40af; color: white; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 500;">
+                                    ${product.category || 'General'}
+                                </span>
+                            </div>
+                            <p style="color: #64748b; font-size: 0.9rem; margin: 0.5rem 0;">${product.description || product.category || 'Quality tire product'}</p>
                             <div style="font-size: 1.25rem; font-weight: 700; color: #1e40af; margin: 0.75rem 0;">
                                 R ${product.price ? parseFloat(product.price).toFixed(2) : '0.00'}
                             </div>
