@@ -628,19 +628,36 @@ app.get("/catalog", async (req, res) => {
       }
     });
     
-    // Fetch real product images and prepare product data
-    const productsWithImages = await Promise.all(
-      Array.from(productMap.values()).slice(0, 12).map(async (item: any) => {
+    // Try to fetch product images, but use placeholders as fallback
+    const productsWithImages = [];
+    const rawProducts = Array.from(productMap.values()).slice(0, 12);
+    
+    for (const item of rawProducts) {
+      try {
+        log(`Checking for images for SKU: ${item.sku}`);
         const images = await getProductImages(item.sku);
         const primaryImage = images.length > 0 ? images[0] : null;
         
-        return {
+        if (primaryImage) {
+          log(`Found image for ${item.sku}: ${primaryImage}`);
+        } else {
+          log(`No images found for ${item.sku}, using placeholder`);
+        }
+        
+        productsWithImages.push({
           ...item,
           imageUrl: primaryImage,
           images: images
-        };
-      })
-    );
+        });
+      } catch (error) {
+        log(`Error fetching images for ${item.sku}: ${error}`);
+        productsWithImages.push({
+          ...item,
+          imageUrl: null,
+          images: []
+        });
+      }
+    }
     
     const products = productsWithImages;
     
