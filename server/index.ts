@@ -8,6 +8,7 @@ function log(message: string) {
   console.log(`[${new Date().toISOString()}] ${message}`);
 }
 
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -105,9 +106,8 @@ app.get("/api/cart", (req, res) => {
   res.json({ items: [], location: "Cape Town Main" });
 });
 
-// Serve assets only, not HTML files
+// Serve assets
 app.use('/attached_assets', express.static(path.resolve(__dirname, "../attached_assets")));
-
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -115,6 +115,69 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const message = err.message || "Internal Server Error";
   res.status(status).json({ message });
   log(`Error: ${message}`);
+});
+
+// For testing purposes, create a simple React test page
+app.get("/app", (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Reivilo B2B Portal - Test Application</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .header { background: #1E3A8A; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .api-test { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px; }
+    .product { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    button { background: #1E3A8A; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏆 Reivilo B2B Portal - Test Environment</h1>
+      <p>45 Years of Family Business Values Since 1980</p>
+    </div>
+    
+    <div class="api-test">
+      <h2>API Testing Dashboard</h2>
+      <button onclick="testProducts()">Test Products API</button>
+      <button onclick="testWarehouses()">Test Warehouses API</button>
+      <button onclick="testUser()">Test User API</button>
+      <button onclick="testCart()">Test Cart API</button>
+    </div>
+    
+    <div id="results"></div>
+  </div>
+
+  <script>
+    async function testAPI(endpoint, title) {
+      try {
+        const response = await fetch('/api' + endpoint);
+        const data = await response.json();
+        displayResults(title, data);
+      } catch (error) {
+        displayResults(title + ' (Error)', { error: error.message });
+      }
+    }
+    
+    function testProducts() { testAPI('/products', 'Products'); }
+    function testWarehouses() { testAPI('/warehouses', 'Warehouses'); }
+    function testUser() { testAPI('/user', 'User'); }
+    function testCart() { testAPI('/cart', 'Cart'); }
+    
+    function displayResults(title, data) {
+      const results = document.getElementById('results');
+      const div = document.createElement('div');
+      div.className = 'api-test';
+      div.innerHTML = '<h3>' + title + '</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      results.appendChild(div);
+    }
+  </script>
+</body>
+</html>
+  `);
 });
 
 // Serve demo page as default
@@ -137,4 +200,5 @@ app.listen(port, "0.0.0.0", () => {
   log(`🚀 Reivilo B2B Portal running on port ${port}`);
   log(`📈 45 Years of Family Business Values Since 1980`);
   log(`🌐 Visit: http://localhost:${port}`);
+  log(`🧪 Test App: http://localhost:${port}/app`);
 });
