@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import HomePage from "@/pages/home-page";
+import CatalogPage from "@/pages/catalog-page";
 import AuthPage from "@/pages/auth-page";
 import CartPage from "@/pages/cart-page";
 import ProfilePage from "@/pages/profile-page";
@@ -23,7 +24,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Switch>
-          <ProtectedRoute path="/" component={HomePage} />
+          <Route path="/" component={HomePage} />
+          <ProtectedRoute path="/catalog" component={CatalogPage} />
           <ProtectedRoute path="/cart" component={CartPage} />
           <ProtectedRoute path="/profile" component={ProfilePage} />
           <Route path="/auth" component={AuthPage} />

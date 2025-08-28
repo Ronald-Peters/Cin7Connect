@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Package, FileText, User, LogOut } from "lucide-react";
+import { ShoppingCart, Package, FileText, User, LogOut, Home } from "lucide-react";
 
 export function Header() {
   const [location, setLocation] = useLocation();
@@ -20,7 +20,8 @@ export function Header() {
   };
 
   const navItems = [
-    { path: "/", label: "Catalog", icon: Package },
+    { path: "/", label: "Home", icon: Home },
+    { path: "/catalog", label: "Catalog", icon: Package },
     { path: "/cart", label: "Cart", icon: ShoppingCart },
     { path: "/profile", label: "Profile", icon: User },
   ];
