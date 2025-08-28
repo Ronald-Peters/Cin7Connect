@@ -1612,7 +1612,11 @@ app.get("/live-preview", async (req, res) => {
 
 // Serve React app at root and handle client-side routing
 app.get("*", (req, res) => {
-  if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+  if (req.path === "/live-preview") {
+    // Keep live preview available
+    return; // Already handled above
+  } else if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+    // Serve React app for all other routes
     res.sendFile(path.resolve(__dirname, "../dist/public/index.html"));
   } else if (req.path === "/app") {
     // Keep the test page available at /app
