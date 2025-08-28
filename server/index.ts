@@ -52,6 +52,16 @@ const CORE_HEADERS = () => ({
   "api-auth-applicationkey": process.env.CIN7_APP_KEY,
 });
 
+async function corePost(path: string, body: any) {
+  const url = `${CORE_BASE_URL}${path}`;
+  const res = await fetch(url, { method: "POST", headers: CORE_HEADERS(), body: JSON.stringify(body) });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Core POST ${url} failed (${res.status}): ${text}`);
+  }
+  return res.json();
+}
+
 /**
  * Helper to call Cin7 Core endpoints with simple error handling + pagination support.
  */
@@ -158,6 +168,88 @@ app.get("/api/availability", (req, res) => {
     { productId: 3, warehouseId: 2, available: 75, onHand: 80, onOrder: 30 },
     { productId: 3, warehouseId: 3, available: 55, onHand: 60, onOrder: 20 }
   ]);
+});
+
+// Core API endpoints matching the working implementation  
+app.get("/api/core/customers", async (req, res) => {
+  try {
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 100);
+    const data = await coreGet("/Customers", { page, limit });
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.get("/api/core/locations", async (req, res) => {
+  try {
+    const data = await coreGet("/Locations", { page: 1, limit: 500 });
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.get("/api/core/availability", async (req, res) => {
+  try {
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 100);
+    const { sku, name, location } = req.query;
+
+    const data = await coreGet("/ProductAvailability", {
+      page,
+      limit,
+      qs: {
+        ...(sku ? { sku } : {}),
+        ...(name ? { name } : {}),
+        ...(location ? { location } : {}),
+      },
+    });
+
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.post("/api/core/sale/quote", async (req, res) => {
+  try {
+    const { customerId, customerName, contact, email, priceTier, location, lines = [], orderMemo } = req.body;
+
+    if (!customerId && !customerName) {
+      return res.status(400).json({ error: "Provide customerId or customerName" });
+    }
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return res.status(400).json({ error: "Provide at least one line" });
+    }
+
+    const payload = {
+      CustomerID: customerId || undefined,
+      Customer: customerName || undefined,
+      Contact: contact || undefined,
+      Email: email || undefined,
+      PriceTier: priceTier || undefined,
+      Location: location || undefined,
+      OrderStatus: "NOTAUTHORISED",
+      InvoiceStatus: "NOTAUTHORISED",
+      OrderMemo: orderMemo || undefined,
+      Lines: lines.map((l: any, idx: number) => ({
+        SKU: l.sku,
+        Quantity: Number(l.quantity),
+        Price: Number(l.price),
+        Tax: 0,
+        Total: 0,
+        TaxRule: l.taxRule || "Standard",
+        LineOrder: l.lineOrder || idx + 1,
+      })),
+    };
+
+    const result = await corePost("/Sale", payload);
+    res.json(result);
+  } catch (e: any) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
 });
 
 app.get("/api/cart", (req, res) => {
