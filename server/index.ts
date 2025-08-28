@@ -678,9 +678,26 @@ app.get("/catalog", async (req, res) => {
     categoryMapping.set('A0594', 'Agri Bias');
     categoryMapping.set('FS0149', 'Flap & Tube');
     
+    // Filter for products that have stock in all three warehouse regions
+    const allProducts = Array.from(productMap.values());
+    const productsWithStockInAllWarehouses = allProducts.filter(item => 
+      item.warehouseBreakdown.jhb.available > 0 && 
+      item.warehouseBreakdown.cpt.available > 0 && 
+      item.warehouseBreakdown.bfn.available > 0
+    );
+    
+    log(`Found ${productsWithStockInAllWarehouses.length} products with stock in all warehouses`);
+    
+    // Use products with stock in all warehouses, or fallback to products with any stock
+    const selectedProducts = productsWithStockInAllWarehouses.length > 0 
+      ? productsWithStockInAllWarehouses.slice(0, 12)
+      : allProducts.filter(item => item.available > 0).slice(0, 12);
+    
+    log(`Displaying ${selectedProducts.length} products with warehouse stock breakdown`);
+    
     // Try to fetch product images, but use placeholders as fallback
     const productsWithImages = [];
-    const rawProducts = Array.from(productMap.values()).slice(0, 12);
+    const rawProducts = selectedProducts;
     
     for (const item of rawProducts) {
       try {
