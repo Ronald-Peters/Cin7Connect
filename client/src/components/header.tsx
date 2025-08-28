@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Package, FileText, User, LogOut } from "lucide-react";
+import { ShoppingCart, Package, FileText, User, LogOut, Shield } from "lucide-react";
 
 export function Header() {
   const [location, setLocation] = useLocation();
@@ -23,6 +23,7 @@ export function Header() {
     { path: "/", label: "Catalog", icon: Package },
     { path: "/cart", label: "Cart", icon: ShoppingCart },
     { path: "/profile", label: "Profile", icon: User },
+    ...(user?.role === 'admin' ? [{ path: "/admin", label: "Admin", icon: Shield }] : []),
   ];
 
   return (

@@ -121,65 +121,28 @@ export default function AuthPage() {
             <TabsContent value="register">
               <Card>
                 <CardHeader>
-                  <CardTitle data-testid="text-register-title">Create Account</CardTitle>
+                  <CardTitle data-testid="text-register-title">Contact Administrator</CardTitle>
                   <CardDescription data-testid="text-register-description">
-                    Register for a new B2B account
+                    Registration is restricted to authorized personnel only
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="text-center py-8 space-y-4">
+                    <Shield className="h-12 w-12 text-muted-foreground mx-auto" />
                     <div>
-                      <Label htmlFor="register-email">Email Address</Label>
-                      <Input
-                        id="register-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                        required
-                        data-testid="input-register-email"
-                      />
+                      <h3 className="font-semibold text-foreground mb-2">
+                        Admin-Controlled Access
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Client accounts are created exclusively by Reivilo administrators. 
+                        Please contact your sales representative for access.
+                      </p>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p>📧 sales2@reiviloindustrial.co.za</p>
+                        <p>📧 ronald@reiviloindustrial.co.za</p>
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor="register-password">Password</Label>
-                      <Input
-                        id="register-password"
-                        type="password"
-                        placeholder="Enter your password"
-                        value={registerForm.password}
-                        onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                        required
-                        data-testid="input-register-password"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="register-confirm-password">Confirm Password</Label>
-                      <Input
-                        id="register-confirm-password"
-                        type="password"
-                        placeholder="Confirm your password"
-                        value={registerForm.confirmPassword}
-                        onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                        required
-                        data-testid="input-register-confirm-password"
-                      />
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
-                      disabled={registerMutation.isPending || registerForm.password !== registerForm.confirmPassword}
-                      data-testid="button-register-submit"
-                    >
-                      {registerMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating Account...
-                        </>
-                      ) : (
-                        "Create Account"
-                      )}
-                    </Button>
-                  </form>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
