@@ -876,7 +876,7 @@ app.get("/catalog", async (req, res) => {
     <header class="header">
         <div class="header-content">
             <div class="logo-section">
-                <img src="/attached_assets/IMG-20240703-WA0009_1756368997024.jpg" alt="Reivilo Logo" style="width: 50px; height: 50px; border-radius: 8px; object-fit: contain; margin-right: 1rem; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges;" />
+                <img src="/attached_assets/generated_images/Professional_Reivilo_web_logo_afb70425.png" alt="Reivilo Logo" style="width: 50px; height: 50px; border-radius: 8px; object-fit: contain; margin-right: 1rem;" />
                 <div>
                     <div class="brand-title">Reivilo B2B Portal</div>
                     <div class="brand-subtitle">Family Business Values Since 1980</div>
