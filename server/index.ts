@@ -1640,25 +1640,28 @@ app.post("/api/checkout", async (req, res) => {
 // Serve static assets including logo
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
-// Serve built frontend assets in production
-if (process.env.NODE_ENV === 'production') {
-  // Production: Serve the built React app
-  const staticPath = path.resolve(__dirname, "public");
-  log(`🗂️ Serving static files from: ${staticPath}`);
-  app.use(express.static(staticPath));
+// Check if React app is available for deployment
+const reactAppPath = path.resolve(__dirname, "public");
+const reactIndexPath = path.join(reactAppPath, "index.html");
+const reactAppExists = require('fs').existsSync(reactIndexPath);
+
+if (reactAppExists) {
+  // Deployment: Serve the built React app
+  log(`🗂️ Serving React app from: ${reactAppPath}`);
+  app.use(express.static(reactAppPath));
   
-  // Serve React app for all non-API routes
+  // Serve React app for all non-API routes  
   app.get("*", (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      const indexPath = path.join(staticPath, "index.html");
-      log(`📄 Serving React app: ${indexPath} for route: ${req.path}`);
-      res.sendFile(indexPath);
-    } else {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/app')) {
+      log(`📄 Serving React app for route: ${req.path}`);
+      res.sendFile(reactIndexPath);
+    } else if (req.path.startsWith('/api')) {
       res.status(404).send('API route not found');
     }
   });
 } else {
   // Development: Serve demo page as default
+  log(`🔧 Development mode - serving demo pages`);
   app.get("/", (req, res) => {
     res.setHeader('Content-Type', 'text/html');
     res.sendFile(path.resolve(__dirname, "../client/demo.html"));
@@ -1666,9 +1669,9 @@ if (process.env.NODE_ENV === 'production') {
 
   // Catch all handler for client-side routing in development
   app.get("*", (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+    if (!req.path.startsWith('/api') && !req.path.includes('.') && !req.path.startsWith('/app')) {
       res.sendFile(path.resolve(__dirname, "../client/demo.html"));
-    } else {
+    } else if (req.path.startsWith('/api')) {
       res.status(404).send('Not found');
     }
   });
