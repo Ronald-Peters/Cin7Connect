@@ -537,6 +537,369 @@ app.get("/app", (req, res) => {
   `);
 });
 
+// Product catalog interface showing live Cin7 data
+app.get("/catalog", async (req, res) => {
+  try {
+    log("Loading live product catalog from Cin7...");
+    const data = await coreGet("/ProductAvailability", { page: 1, limit: 20 });
+    
+    // Filter to only allowed warehouse locations
+    const allowedWarehouses = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"];
+    const availabilityArray = data.ProductAvailability || [];
+    
+    const filteredAvailability = availabilityArray.filter((item: any) => 
+      allowedWarehouses.includes(item.Location)
+    );
+    
+    // Group stock by product and combine warehouse totals
+    const productMap = new Map();
+    
+    filteredAvailability.forEach((item: any) => {
+      const sku = item.SKU;
+      if (!productMap.has(sku)) {
+        productMap.set(sku, {
+          sku: sku,
+          name: item.Name || item.ProductName,
+          available: 0,
+          onHand: 0,
+          warehouseBreakdown: {
+            jhb: { available: 0, onHand: 0 },
+            cpt: { available: 0, onHand: 0 },
+            bfn: { available: 0, onHand: 0 }
+          }
+        });
+      }
+      
+      const product = productMap.get(sku);
+      product.available += item.Available || 0;
+      product.onHand += item.OnHand || 0;
+      
+      if (["B-VDB", "S-POM"].includes(item.Location)) {
+        product.warehouseBreakdown.jhb.available += item.Available || 0;
+        product.warehouseBreakdown.jhb.onHand += item.OnHand || 0;
+      } else if (["B-CPT", "S-CPT"].includes(item.Location)) {
+        product.warehouseBreakdown.cpt.available += item.Available || 0;
+        product.warehouseBreakdown.cpt.onHand += item.OnHand || 0;
+      } else if (item.Location === "S-BFN") {
+        product.warehouseBreakdown.bfn.available += item.Available || 0;
+        product.warehouseBreakdown.bfn.onHand += item.OnHand || 0;
+      }
+    });
+    
+    const products = Array.from(productMap.values()).slice(0, 12);
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reivilo B2B - Product Catalog</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background: #f8fafc; 
+            color: #1e40af;
+            line-height: 1.6;
+        }
+        .header {
+            background: white;
+            border-bottom: 3px solid #1e3a8a;
+            padding: 1rem 0;
+            box-shadow: 0 2px 8px rgba(30, 58, 138, 0.1);
+        }
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .brand-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+        .brand-subtitle {
+            font-size: 0.85rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .page-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        .page-title {
+            font-size: 2.5rem;
+            color: #1e3a8a;
+            margin-bottom: 0.5rem;
+        }
+        .page-subtitle {
+            color: #64748b;
+            font-size: 1.1rem;
+        }
+        .stats-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 12px rgba(30, 58, 138, 0.08);
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        .stat {
+            flex: 1;
+        }
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+        .stat-label {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 1.5rem;
+        }
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 12px rgba(30, 58, 138, 0.08);
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+        }
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(30, 58, 138, 0.15);
+        }
+        .product-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .product-image {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .product-info h3 {
+            font-size: 1.1rem;
+            color: #1e40af;
+            margin-bottom: 0.25rem;
+        }
+        .product-sku {
+            color: #64748b;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .product-stock {
+            margin: 1rem 0;
+        }
+        .stock-total {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #059669;
+            margin-bottom: 0.5rem;
+        }
+        .warehouse-breakdown {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+        }
+        .warehouse-item {
+            background: #f8fafc;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        .warehouse-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 0.25rem;
+        }
+        .warehouse-stock {
+            font-size: 0.9rem;
+            color: #059669;
+            font-weight: 500;
+        }
+        .warehouse-stock.zero {
+            color: #dc2626;
+        }
+        .actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.75rem;
+        }
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            flex: 1;
+            transition: all 0.2s ease;
+        }
+        .btn-primary {
+            background: #1e3a8a;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #1e40af;
+        }
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+        .no-stock {
+            opacity: 0.6;
+        }
+        .footer {
+            margin-top: 3rem;
+            text-align: center;
+            color: #64748b;
+            padding: 2rem;
+            border-top: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo-section">
+                <div>
+                    <div class="brand-title">Reivilo B2B Portal</div>
+                    <div class="brand-subtitle">Family Business Values Since 1980</div>
+                </div>
+            </div>
+            <div style="color: #64748b; font-weight: 500;">Live Inventory System</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">Product Catalog</h1>
+            <p class="page-subtitle">Real-time inventory across JHB, CPT & BFN warehouses</p>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <div class="stat-number">${products.length}</div>
+                <div class="stat-label">Products Available</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">3</div>
+                <div class="stat-label">Warehouse Regions</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">${products.reduce((sum, p) => sum + p.available, 0)}</div>
+                <div class="stat-label">Total Stock</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">ZAR</div>
+                <div class="stat-label">Pricing Currency</div>
+            </div>
+        </div>
+
+        <div class="products-grid">
+            ${products.map(product => `
+                <div class="product-card ${product.available === 0 ? 'no-stock' : ''}">
+                    <div class="product-header">
+                        <div class="product-image">
+                            ${product.sku.substring(0, 2)}
+                        </div>
+                        <div class="product-info">
+                            <h3>${product.name}</h3>
+                            <div class="product-sku">SKU: ${product.sku}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="product-stock">
+                        <div class="stock-total">
+                            ${product.available > 0 ? `${product.available} Available` : 'Out of Stock'}
+                        </div>
+                        
+                        <div class="warehouse-breakdown">
+                            <div class="warehouse-item">
+                                <div class="warehouse-name">JHB</div>
+                                <div class="warehouse-stock ${product.warehouseBreakdown.jhb.available === 0 ? 'zero' : ''}">
+                                    ${product.warehouseBreakdown.jhb.available}
+                                </div>
+                            </div>
+                            <div class="warehouse-item">
+                                <div class="warehouse-name">CPT</div>
+                                <div class="warehouse-stock ${product.warehouseBreakdown.cpt.available === 0 ? 'zero' : ''}">
+                                    ${product.warehouseBreakdown.cpt.available}
+                                </div>
+                            </div>
+                            <div class="warehouse-item">
+                                <div class="warehouse-name">BFN</div>
+                                <div class="warehouse-stock ${product.warehouseBreakdown.bfn.available === 0 ? 'zero' : ''}">
+                                    ${product.warehouseBreakdown.bfn.available}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="actions">
+                        <button class="btn btn-primary" ${product.available === 0 ? 'disabled' : ''}>
+                            Add to Cart
+                        </button>
+                        <button class="btn btn-secondary">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2025 Reivilo B2B Portal - 45 Years of Family Business Values</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem;">Live data synced from inventory management system</p>
+        </div>
+    </div>
+</body>
+</html>
+    `);
+    
+    log(`Successfully generated product catalog with ${products.length} live products`);
+  } catch (error: any) {
+    log(`Error generating catalog: ${error.message}`);
+    res.status(500).send("Error loading product catalog");
+  }
+});
+
 // Serve demo page as default
 app.get("/", (req, res) => {
   res.setHeader('Content-Type', 'text/html');
