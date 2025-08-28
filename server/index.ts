@@ -59,8 +59,21 @@ app.get("/api/user", (req, res) => {
 app.get("/api/products", async (req, res) => {
   try {
     log("Fetching products from Cin7...");
-    const products = await cin7.getProducts();
-    const processedProducts = products.slice(0, 10).map((product: any, index: number) => ({
+    const response = await cin7.getProducts();
+    log(`Cin7 products response: ${JSON.stringify(response).substring(0, 200)}...`);
+    
+    // Handle different response formats from Cin7
+    let productsArray = [];
+    if (Array.isArray(response)) {
+      productsArray = response;
+    } else if (response && response.data && Array.isArray(response.data)) {
+      productsArray = response.data;
+    } else if (response && typeof response === 'object') {
+      // If it's a single product, wrap in array
+      productsArray = [response];
+    }
+    
+    const processedProducts = productsArray.slice(0, 10).map((product: any, index: number) => ({
       id: index + 1,
       sku: product.SKU || `REI00${index + 1}`,
       name: product.Name || `Product ${index + 1}`,
@@ -83,8 +96,21 @@ app.get("/api/products", async (req, res) => {
 app.get("/api/warehouses", async (req, res) => {
   try {
     log("Fetching warehouses from Cin7...");
-    const locations = await cin7.getLocations();
-    const warehouses = locations.map((location: any, index: number) => ({
+    const response = await cin7.getLocations();
+    log(`Cin7 locations response: ${JSON.stringify(response).substring(0, 200)}...`);
+    
+    // Handle different response formats from Cin7
+    let locationsArray = [];
+    if (Array.isArray(response)) {
+      locationsArray = response;
+    } else if (response && response.data && Array.isArray(response.data)) {
+      locationsArray = response.data;
+    } else if (response && typeof response === 'object') {
+      // If it's a single location, wrap in array
+      locationsArray = [response];
+    }
+    
+    const warehouses = locationsArray.map((location: any, index: number) => ({
       id: index + 1,
       name: location.Name || location.LocationName || `Location ${index + 1}`,
       location: location.Name || location.LocationName || "Unknown"
