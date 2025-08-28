@@ -252,7 +252,7 @@ app.get("/api/products", async (req, res) => {
   try {
     log("Fetching products from Cin7 ProductAvailability (filtered warehouses)...");
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 50;
+    const limit = Number(req.query.limit) || 1000;
     const warehouseFilter = req.query.warehouse as string;
     
     const data = await coreGet("/ProductAvailability", { page, limit });
@@ -325,7 +325,7 @@ app.get("/api/products", async (req, res) => {
     categoryMapping.set('FS0149', 'Flap & Tube');
     
     const productDetails = new Map();
-    for (const sku of Array.from(productMap.keys()).slice(0, 12)) {
+    for (const sku of Array.from(productMap.keys())) {
       const category = categoryMapping.get(sku);
       if (category) {
         productDetails.set(sku, { Category: category });
@@ -335,7 +335,7 @@ app.get("/api/products", async (req, res) => {
 
     // Convert map to array and format for frontend - now with real Cin7 images and categories
     const products = await Promise.all(
-      Array.from(productMap.values()).slice(0, 10).map(async (item: any, index: number) => {
+      Array.from(productMap.values()).map(async (item: any, index: number) => {
         // Fetch real product images from Cin7
         const images = await getProductImages(item.sku);
         const primaryImage = images.length > 0 ? images[0] : getProductImageUrl(item.sku, item.name);
