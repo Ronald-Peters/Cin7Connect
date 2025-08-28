@@ -264,8 +264,8 @@ app.get("/api/products", async (req, res) => {
           id: index + 1,
           sku: item.sku || `REI00${index + 1}`,
           name: item.name || `Product ${index + 1}`,
-          description: categoryName || 'Agriculture Tire',
-          price: item.sellPrice || 299.99, // Real pricing from Cin7
+          description: item.description || item.category || 'Agriculture Tire',
+          price: item.price || 0, // Real pricing from Cin7
           currency: "ZAR",
           available: item.available,
           onHand: item.onHand,
@@ -619,13 +619,14 @@ app.get("/catalog", async (req, res) => {
   try {
     log("Loading live product catalog from Cin7...");
     
-    // Fetch all data using pagination (1000 is the max per page)
+    // Step 1: Fetch all stock data using pagination (1000 is the max per page)
+    log("📦 Fetching stock availability data...");
     let allAvailabilityData = [];
     let currentPage = 1;
     let totalFetched = 0;
     
     do {
-      log(`Fetching page ${currentPage} (max 1000 records per page)...`);
+      log(`Fetching availability page ${currentPage} (max 1000 records per page)...`);
       const pageData = await coreGet("/ProductAvailability", { 
         page: currentPage, 
         limit: 1000 
@@ -636,7 +637,6 @@ app.get("/catalog", async (req, res) => {
       totalFetched += pageRecords.length;
       
       log(`📊 Page ${currentPage}: ${pageRecords.length} records (Total so far: ${totalFetched})`);
-      log(`📊 API Total Count: ${pageData.Total || 'not provided'}`);
       
       // Continue if we got a full page of 1000 records
       if (pageRecords.length === 1000) {
@@ -652,7 +652,56 @@ app.get("/catalog", async (req, res) => {
       }
     } while (true);
     
-    log(`🎉 FINAL TOTAL: ${allAvailabilityData.length} records fetched from ${currentPage} pages`);
+    log(`🎉 STOCK DATA: ${allAvailabilityData.length} records fetched from ${currentPage} pages`);
+    
+    // Step 2: Fetch all product data with pricing information
+    log("💰 Fetching product pricing data...");
+    let allProductData = [];
+    currentPage = 1;
+    totalFetched = 0;
+    
+    do {
+      log(`Fetching products page ${currentPage} (max 1000 records per page)...`);
+      const pageData = await coreGet("/Products", { 
+        page: currentPage, 
+        limit: 1000 
+      });
+      
+      const pageRecords = pageData.Products || [];
+      allProductData = allProductData.concat(pageRecords);
+      totalFetched += pageRecords.length;
+      
+      log(`💰 Page ${currentPage}: ${pageRecords.length} products (Total so far: ${totalFetched})`);
+      
+      // Continue if we got a full page of 1000 records
+      if (pageRecords.length === 1000) {
+        currentPage++;
+      } else {
+        break;
+      }
+      
+      // Safety limit to prevent infinite loops
+      if (currentPage > 20) {
+        log(`⚠️ Reached safety limit of 20 pages (20,000 products)`);
+        break;
+      }
+    } while (true);
+    
+    log(`🎉 PRICING DATA: ${allProductData.length} products fetched from ${currentPage} pages`);
+    
+    // Create a pricing lookup map
+    const pricingMap = new Map();
+    allProductData.forEach((product: any) => {
+      pricingMap.set(product.SKU, {
+        price: product.PriceTier1 || 0,
+        priceTiers: product.PriceTiers || {},
+        brand: product.Brand,
+        category: product.Category,
+        description: product.Description
+      });
+    });
+    
+    log(`💰 PRICING MAP: ${pricingMap.size} products with pricing data`);
     
     // Analyze all unique locations in the complete dataset
     const allLocations = [...new Set(allAvailabilityData.map((item: any) => item.Location))];
@@ -677,17 +726,29 @@ app.get("/catalog", async (req, res) => {
     const uniqueProducts = [...new Set(filteredAvailability.map((item: any) => item.SKU))];
     log(`🏷️  UNIQUE PRODUCTS: ${uniqueProducts.length} SKUs found`);
     
+    // Sample pricing data to verify integration
+    if (filteredAvailability.length > 0) {
+      const sampleSku = filteredAvailability[0].SKU;
+      const samplePricing = pricingMap.get(sampleSku);
+      log(`💰 SAMPLE PRICING for ${sampleSku}: R ${samplePricing?.price || 0} (${samplePricing?.category || 'No category'})`);
+    }
+    
     // Group stock by product and combine warehouse totals
     const productMap = new Map();
     
     filteredAvailability.forEach((item: any) => {
       const sku = item.SKU;
       if (!productMap.has(sku)) {
+        const pricing = pricingMap.get(sku) || {};
         productMap.set(sku, {
           sku: sku,
           name: item.Name || item.ProductName,
           available: 0,
           onHand: 0,
+          price: pricing.price || 0,
+          brand: pricing.brand || '',
+          category: pricing.category || '',
+          description: pricing.description || '',
           warehouseBreakdown: {
             jhb: { available: 0, onHand: 0 },
             cpt: { available: 0, onHand: 0 },
@@ -738,7 +799,7 @@ app.get("/catalog", async (req, res) => {
     
     log(`Displaying ${selectedProducts.length} products sorted by stock levels for verification`);
     selectedProducts.forEach(product => {
-      log(`${product.sku}: Total=${product.available}, JHB=${product.warehouseBreakdown.jhb.available}, CPT=${product.warehouseBreakdown.cpt.available}, BFN=${product.warehouseBreakdown.bfn.available}`);
+      log(`${product.sku}: R ${product.price} | Total=${product.available}, JHB=${product.warehouseBreakdown.jhb.available}, CPT=${product.warehouseBreakdown.cpt.available}, BFN=${product.warehouseBreakdown.bfn.available}`);
     });
     
     // Try to fetch product images, but use placeholders as fallback
