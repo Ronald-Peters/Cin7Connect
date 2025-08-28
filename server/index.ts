@@ -63,6 +63,19 @@ async function corePost(path: string, body: any) {
 }
 
 /**
+ * Helper to generate product image URLs
+ * For now using placeholder images, can be enhanced to fetch from Cin7 ProductAttachments
+ */
+function getProductImageUrl(sku: string, productName: string): string {
+  // Generate consistent placeholder images based on product type
+  if (productName?.toLowerCase().includes('tyre') || productName?.toLowerCase().includes('tire')) {
+    return `https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=${encodeURIComponent(sku)}`;
+  }
+  // Default product image
+  return `https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=${encodeURIComponent(sku)}`;
+}
+
+/**
  * Helper to call Cin7 Core endpoints with simple error handling + pagination support.
  */
 async function coreGet(path: string, { page = 1, limit, qs = {} }: { page?: number; limit?: number; qs?: Record<string, any> } = {}) {
@@ -171,7 +184,10 @@ app.get("/api/products", async (req, res) => {
       available: item.available,
       onHand: item.onHand,
       onOrder: item.onOrder,
-      warehouseBreakdown: item.warehouseBreakdown
+      warehouseBreakdown: item.warehouseBreakdown,
+      // Product image support - using placeholder for now, will be populated from Cin7
+      imageUrl: getProductImageUrl(item.sku, item.name),
+      images: [] // Additional product images would be loaded here
     }));
     
     res.json({
@@ -302,6 +318,60 @@ app.get("/api/core/customers", async (req, res) => {
     const page = Number(req.query.page || 1);
     const limit = Number(req.query.limit || 100);
     const data = await coreGet("/Customers", { page, limit });
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// Enhanced product images endpoint - attempts to fetch real images from Cin7
+app.get("/api/product-images/:sku", async (req, res) => {
+  try {
+    const sku = req.params.sku;
+    log(`Fetching product images for SKU: ${sku}`);
+    
+    // For now, return the placeholder image
+    // TODO: When Cin7 ProductAttachments API is available, fetch real images here
+    const imageUrl = getProductImageUrl(sku, `Product ${sku}`);
+    
+    res.json({
+      sku: sku,
+      primaryImage: imageUrl,
+      additionalImages: [],
+      totalImages: 1
+    });
+    
+    log(`Returned placeholder image for SKU: ${sku}`);
+  } catch (error: any) {
+    log(`Error fetching product images for ${req.params.sku}: ${error.message}`);
+    res.status(500).json({ error: "Failed to fetch product images" });
+  }
+});
+
+// Core API endpoints for testing (when authentication allows)
+app.get("/api/core/products", async (req, res) => {
+  try {
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 50);
+    const data = await coreGet("/ProductMaster", { page, limit });
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.get("/api/core/attachments", async (req, res) => {
+  try {
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 50);
+    const productId = req.query.productid as string;
+    
+    const params: any = { page, limit };
+    if (productId) {
+      params.productid = productId;
+    }
+    
+    const data = await coreGet("/ProductAttachments", params);
     res.json(data);
   } catch (e: any) {
     res.status(500).json({ error: String(e.message || e) });
