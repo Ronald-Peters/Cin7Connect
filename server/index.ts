@@ -47,6 +47,22 @@ app.use((req, res, next) => {
 // Initialize Cin7 service (credentials come from environment variables)
 const cin7 = new Cin7Service();
 
+// Test connection endpoint
+app.get("/api/test-connection", async (req, res) => {
+  try {
+    log("Testing Cin7 connection...");
+    log(`Using baseURL: ${process.env.CIN7_BASE_URL || 'https://inventory.cin7.com/api/v1'}`);
+    log(`Account ID exists: ${!!process.env.CIN7_ACCOUNT_ID}`);
+    log(`App Key exists: ${!!process.env.CIN7_APP_KEY}`);
+    
+    const result = await cin7.testConnection();
+    res.json({ success: true, connected: result });
+  } catch (error: any) {
+    log(`Connection test failed: ${error.message}`);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Live API routes connecting to Cin7
 app.get("/api/user", (req, res) => {
   res.json({ id: 1, username: "demo", companyName: "Demo Company" });

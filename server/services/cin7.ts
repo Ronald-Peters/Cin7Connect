@@ -70,7 +70,7 @@ export class Cin7Service {
 
   constructor() {
     this.config = {
-      baseURL: process.env.CIN7_BASE_URL || 'https://inventory.cin7.com/api/v1',
+      baseURL: process.env.CIN7_BASE_URL || 'https://inventory.dearsystems.com/ExternalApi',
       accountId: process.env.CIN7_ACCOUNT_ID || '',
       appKey: process.env.CIN7_APP_KEY || '',
     };
@@ -127,7 +127,7 @@ export class Cin7Service {
 
   async testConnection(): Promise<boolean> {
     try {
-      await this.client.get('/Locations', { 
+      await this.client.get('/Location', { 
         params: { limit: 1 } 
       });
       return true;
@@ -138,7 +138,7 @@ export class Cin7Service {
 
   async getLocations(): Promise<Cin7Location[]> {
     try {
-      const response = await this.client.get('/Locations');
+      const response = await this.client.get('/Location');
       return response.data || [];
     } catch (error) {
       throw this.formatError(error as AxiosError);
@@ -174,7 +174,7 @@ export class Cin7Service {
         limit: Math.min(limit, 500)
       };
       
-      const response = await this.client.get('/Products', { params });
+      const response = await this.client.get('/Product', { params });
       return {
         data: response.data || [],
         pagination: {
