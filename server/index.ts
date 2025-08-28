@@ -1785,33 +1785,20 @@ app.get("/login", (req, res) => {
   }
 });
 
-// Serve demo page as default
+// Serve the approved locked demo page as home page
 app.get("/", (req, res) => {
   try {
     res.setHeader('Content-Type', 'text/html');
     
-    // In production, serve from dist/public, in development from client
-    const demoPath = process.env.NODE_ENV === 'production' 
-      ? path.resolve(__dirname, "./public/index.html")
-      : path.resolve(__dirname, "../client/demo.html");
+    // Always serve the approved demo.html for home page (locked layout)
+    const demoPath = path.resolve(__dirname, "../client/demo.html");
     
-    log(`📄 Serving home page from: ${demoPath}`);
+    log(`📄 Serving locked home page from: ${demoPath}`);
     
     res.sendFile(demoPath, (err) => {
       if (err) {
-        log(`❌ Error serving home page: ${err.message}`);
-        // Fallback to client demo.html if production file missing
-        if (process.env.NODE_ENV === 'production') {
-          const fallbackPath = path.resolve(__dirname, "../client/demo.html");
-          res.sendFile(fallbackPath, (fallbackErr) => {
-            if (fallbackErr) {
-              log(`❌ Fallback also failed: ${fallbackErr.message}`);
-              res.status(500).send('Internal Server Error - Home page not found');
-            }
-          });
-        } else {
-          res.status(500).send('Internal Server Error - Demo page not found');
-        }
+        log(`❌ Error serving locked home page: ${err.message}`);
+        res.status(500).send('Internal Server Error - Locked home page not found');
       }
     });
   } catch (error: any) {
@@ -1820,32 +1807,46 @@ app.get("/", (req, res) => {
   }
 });
 
-// Catch all handler for client-side routing
+// React app routes (for authenticated portal functionality)
+app.get("/app", (req, res) => {
+  try {
+    const reactAppPath = process.env.NODE_ENV === 'production' 
+      ? path.resolve(__dirname, "./public/index.html")
+      : path.resolve(__dirname, "../dist/public/index.html");
+    
+    log(`⚛️ Serving React app from: ${reactAppPath}`);
+    res.sendFile(reactAppPath, (err) => {
+      if (err) {
+        log(`❌ Error serving React app: ${err.message}`);
+        res.status(500).send('React app error');
+      }
+    });
+  } catch (error: any) {
+    log(`❌ Error in /app route: ${error.message}`);
+    res.status(500).send('React app error');
+  }
+});
+
+// Catch all handler for client-side routing within React app
 app.get("*", (req, res) => {
   try {
     if (!req.path.startsWith('/api') && !req.path.includes('.')) {
-      // In production, serve from dist/public, in development from client
-      const demoPath = process.env.NODE_ENV === 'production' 
-        ? path.resolve(__dirname, "./public/index.html")
-        : path.resolve(__dirname, "../client/demo.html");
-      
-      res.sendFile(demoPath, (err) => {
-        if (err) {
-          log(`❌ Error serving ${req.path}: ${err.message}`);
-          // Fallback to client demo.html if production file missing
-          if (process.env.NODE_ENV === 'production') {
-            const fallbackPath = path.resolve(__dirname, "../client/demo.html");
-            res.sendFile(fallbackPath, (fallbackErr) => {
-              if (fallbackErr) {
-                log(`❌ Fallback failed for ${req.path}: ${fallbackErr.message}`);
-                res.status(404).send('Page not found');
-              }
-            });
-          } else {
+      // For React app routes, serve the React app
+      if (req.path.startsWith('/auth') || req.path.startsWith('/admin') || req.path.startsWith('/cart') || req.path.startsWith('/profile')) {
+        const reactAppPath = process.env.NODE_ENV === 'production' 
+          ? path.resolve(__dirname, "./public/index.html")
+          : path.resolve(__dirname, "../dist/public/index.html");
+        
+        res.sendFile(reactAppPath, (err) => {
+          if (err) {
+            log(`❌ Error serving React route ${req.path}: ${err.message}`);
             res.status(404).send('Page not found');
           }
-        }
-      });
+        });
+      } else {
+        // For other routes, redirect to home page
+        res.redirect('/');
+      }
     } else {
       res.status(404).send('Not found');
     }
