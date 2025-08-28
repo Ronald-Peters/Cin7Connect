@@ -1846,7 +1846,7 @@ app.get("*", (req, res) => {
   try {
     if (!req.path.startsWith('/api') && !req.path.includes('.')) {
       // For React app routes, serve the React app
-      if (req.path.startsWith('/auth') || req.path.startsWith('/admin') || req.path.startsWith('/cart') || req.path.startsWith('/profile')) {
+      if (req.path.startsWith('/auth') || req.path.startsWith('/admin') || req.path.startsWith('/cart') || req.path.startsWith('/profile') || req.path.startsWith('/catalog')) {
         const reactAppPath = process.env.NODE_ENV === 'production' 
           ? path.resolve(__dirname, "./public/index.html")
           : path.resolve(__dirname, "../dist/public/index.html");
