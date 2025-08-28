@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
 import { setupAuth } from "./auth";
+import { storage } from "./storage";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
