@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
+import { setupAuth } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,6 +15,9 @@ function log(message: string) {
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Setup authentication
+setupAuth(app);
 
 app.use((req, res, next) => {
   const start = Date.now();
