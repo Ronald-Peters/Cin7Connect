@@ -75,7 +75,7 @@ app.get("/api/products", async (req, res) => {
     log(`Cin7 products response structure: ${typeof response}, keys: ${Object.keys(response || {})}`);
     
     // The getProducts method returns { data: [], pagination: {} }
-    const productsArray = response?.data || [];
+    const productsArray = Array.isArray(response?.data) ? response.data : [];
     
     const processedProducts = productsArray.slice(0, 10).map((product: any, index: number) => ({
       id: index + 1,
@@ -100,8 +100,12 @@ app.get("/api/products", async (req, res) => {
 app.get("/api/warehouses", async (req, res) => {
   try {
     log("Fetching warehouses from Cin7...");
-    const locationsArray = await cin7.getLocations();
-    log(`Cin7 locations response: ${locationsArray.length} locations found`);
+    const locationsResponse = await cin7.getLocations();
+    log(`Cin7 locations response type: ${typeof locationsResponse}`);
+    
+    // Handle the locations data correctly
+    const locationsArray = Array.isArray(locationsResponse) ? locationsResponse : [];
+    log(`Processing ${locationsArray.length} locations`);
     
     const warehouses = locationsArray.map((location: any, index: number) => ({
       id: index + 1,
