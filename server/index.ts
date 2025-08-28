@@ -1660,19 +1660,22 @@ if (reactAppExists) {
     }
   });
 } else {
-  // Development: Serve demo page as default
-  log(`🔧 Development mode - serving demo pages`);
-  app.get("/", (req, res) => {
-    res.setHeader('Content-Type', 'text/html');
-    res.sendFile(path.resolve(__dirname, "../client/demo.html"));
-  });
-
-  // Catch all handler for client-side routing in development
+  // Development: Fallback message if React app not found
+  log(`⚠️ React app not found - deployment may be incomplete`);
   app.get("*", (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.includes('.') && !req.path.startsWith('/app')) {
-      res.sendFile(path.resolve(__dirname, "../client/demo.html"));
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/app')) {
+      res.status(503).send(`
+        <html>
+          <head><title>Reivilo B2B Portal</title></head>
+          <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h1>React App Loading...</h1>
+            <p>The React application is being deployed. Please refresh in a moment.</p>
+            <p>If this message persists, the build may be incomplete.</p>
+          </body>
+        </html>
+      `);
     } else if (req.path.startsWith('/api')) {
-      res.status(404).send('Not found');
+      res.status(404).send('API route not found');
     }
   });
 }
