@@ -1686,12 +1686,12 @@ app.post("/api/checkout", async (req, res) => {
 // Serve static assets including logo
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
-// Serve built static files
+// Serve CSS and JS assets only (not index.html)
 const publicPath = process.env.NODE_ENV === 'production' 
   ? path.resolve(__dirname, "./public")
   : path.resolve(__dirname, "../dist/public");
-app.use(express.static(publicPath));
-log(`📁 Serving static files from: ${publicPath}`);
+app.use("/assets", express.static(path.join(publicPath, "assets")));
+log(`📁 Serving assets from: ${path.join(publicPath, "assets")}`);
 
 // Admin page route
 app.get("/admin", (req, res) => {
@@ -1798,7 +1798,14 @@ app.get("/", (req, res) => {
     res.sendFile(demoPath, (err) => {
       if (err) {
         log(`❌ Error serving locked home page: ${err.message}`);
-        res.status(500).send('Internal Server Error - Locked home page not found');
+        // If demo.html not found, check if it exists in current directory
+        const fallbackDemo = path.resolve(__dirname, "./demo.html");
+        res.sendFile(fallbackDemo, (fallbackErr) => {
+          if (fallbackErr) {
+            log(`❌ Fallback demo failed: ${fallbackErr.message}`);
+            res.status(500).send('Internal Server Error - Locked home page not found');
+          }
+        });
       }
     });
   } catch (error: any) {
