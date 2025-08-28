@@ -1885,11 +1885,19 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-app.listen(port, "0.0.0.0", () => {
+app.listen(port, "0.0.0.0", async () => {
   log(`🚀 Reivilo B2B Portal running on port ${port}`);
   log(`📈 45 Years of Family Business Values Since 1980`);
   log(`🌐 Visit: http://localhost:${port}`);
   log(`🧪 Test App: http://localhost:${port}/app`);
   log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
   log(`🔑 Secrets loaded: ${process.env.CIN7_ACCOUNT_ID ? '✓' : '✗'} CIN7, ${process.env.DATABASE_URL ? '✓' : '✗'} DB`);
+  
+  // Sync Cin7 products to database on startup
+  try {
+    const result = await storage.syncCin7Products();
+    log(`📦 Database sync complete: ${result.synced} products synced, ${result.errors} errors`);
+  } catch (error) {
+    log(`❌ Database sync failed: ${error}`);
+  }
 });

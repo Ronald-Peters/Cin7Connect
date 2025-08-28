@@ -104,6 +104,83 @@ export class DatabaseStorage implements IStorage {
     // Implementation will fetch all customers from Cin7 and upsert them
   }
 
+  async syncCin7Products(): Promise<{ synced: number; errors: number }> {
+    try {
+      console.log('🔄 Starting Cin7 product sync...');
+      
+      // Use the exact same logic as the working demo catalog
+      const { cin7Service } = await import('./services/cin7');
+      
+      // Get availability data (this works!)
+      const locations = ['S-CPT', 'S-BFN', 'B-VDB']; // JHB, CPT, BFN
+      let allAvailability: any[] = [];
+      
+      for (const location of locations) {
+        const { data } = await cin7Service.getProductAvailability(location, 1, 1000);
+        if (Array.isArray(data)) {
+          allAvailability.push(...data);
+        }
+      }
+      
+      // Get pricing data (this works!)
+      const { data: allProducts } = await cin7Service.getProducts(1, 1000);
+      
+      // Create pricing map
+      const pricingMap = new Map();
+      if (Array.isArray(allProducts)) {
+        allProducts.forEach((product: any) => {
+          if (product.SKU) {
+            pricingMap.set(product.SKU, {
+              price: parseFloat(product.DefaultSellPrice || '0'),
+              name: product.Name,
+              category: product.Category,
+              description: product.Description,
+              barcode: product.Barcode,
+              brand: product.Brand
+            });
+          }
+        });
+      }
+      
+      // Get unique SKUs from availability data
+      const uniqueSkus = [...new Set(allAvailability.map(item => item.SKU).filter(Boolean))];
+      
+      let synced = 0;
+      let errors = 0;
+      
+      console.log(`📦 Processing ${uniqueSkus.length} unique SKUs from availability data`);
+      
+      for (const sku of uniqueSkus) {
+        try {
+          const pricing = pricingMap.get(sku);
+          
+          await this.upsertProduct({
+            sku: sku,
+            name: pricing?.name || sku,
+            description: pricing?.description || pricing?.name || sku,
+            price: pricing?.price || 0,
+            currency: 'ZAR',
+            category: pricing?.category || 'General',
+            barcode: pricing?.barcode,
+            brand: pricing?.brand,
+            imageUrl: null,
+            images: [],
+          });
+          synced++;
+        } catch (error) {
+          console.error(`Error syncing product ${sku}:`, error);
+          errors++;
+        }
+      }
+      
+      console.log(`✅ Cin7 product sync complete: ${synced} synced, ${errors} errors`);
+      return { synced, errors };
+    } catch (error) {
+      console.error('❌ Cin7 product sync failed:', error);
+      return { synced: 0, errors: 1 };
+    }
+  }
+
   async getCustomerById(id: number): Promise<Customer | undefined> {
     const [customer] = await db.select().from(customers).where(eq(customers.id, id));
     return customer || undefined;

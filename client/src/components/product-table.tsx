@@ -272,7 +272,7 @@ export function ProductTable() {
                               value={selectedWarehouses[product.id]?.toString() || ""}
                               onValueChange={(value) => setSelectedWarehouses({
                                 ...selectedWarehouses,
-                                [product.id]: parseInt(value)
+                                [product.id]: value
                               })}
                               data-testid={`select-warehouse-${product.id}`}
                             >
@@ -299,7 +299,7 @@ export function ProductTable() {
                               className="w-16 h-8 text-xs"
                               data-testid={`input-quantity-${product.id}`}
                             />
-                            {canAddToCart(product.id) ? (
+                            {canAddToCart(product) ? (
                               <Button
                                 size="sm"
                                 onClick={() => handleAddToCart(product)}
@@ -331,11 +331,11 @@ export function ProductTable() {
           </div>
           
           {/* Pagination */}
-          {products && products.totalPages > 1 && (
+          {products && (products.totalPages || 0) > 1 && (
             <div className="px-6 py-4 border-t border-border bg-muted/30">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground" data-testid="text-pagination-info">
-                  Showing {((products.page - 1) * products.pageSize) + 1} to {Math.min(products.page * products.pageSize, products.total)} of {products.total} products
+                  Showing {(((products.page || 1) - 1) * (products.pageSize || 50)) + 1} to {Math.min((products.page || 1) * (products.pageSize || 50), Number(products.total))} of {products.total} products
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button
@@ -354,7 +354,7 @@ export function ProductTable() {
                     variant="outline"
                     size="sm"
                     onClick={() => setPage(page + 1)}
-                    disabled={page >= products.totalPages}
+                    disabled={page >= (products.totalPages || 1)}
                     data-testid="button-next-page"
                   >
                     Next
