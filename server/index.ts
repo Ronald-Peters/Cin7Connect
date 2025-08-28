@@ -951,11 +951,20 @@ app.get("/catalog", async (req, res) => {
                     </div>
                     
                     <div class="actions">
-                        <button class="btn btn-primary" ${product.available === 0 ? 'disabled' : ''}>
-                            Add to Cart
-                        </button>
-                        <button class="btn btn-secondary">
-                            View Details
+                        <select class="warehouse-select" id="warehouse-${product.sku}" style="margin-bottom: 8px; padding: 4px; border: 1px solid #e2e8f0; border-radius: 4px; width: 100%;">
+                            <option value="">Select Warehouse</option>
+                            ${product.warehouseBreakdown.jhb.available > 0 ? '<option value="JHB Warehouse">JHB Warehouse (' + product.warehouseBreakdown.jhb.available + ' available)</option>' : ''}
+                            ${product.warehouseBreakdown.cpt.available > 0 ? '<option value="CPT Warehouse">CPT Warehouse (' + product.warehouseBreakdown.cpt.available + ' available)</option>' : ''}
+                            ${product.warehouseBreakdown.bfn.available > 0 ? '<option value="BFN Warehouse">BFN Warehouse (' + product.warehouseBreakdown.bfn.available + ' available)</option>' : ''}
+                        </select>
+                        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                            <input type="number" id="qty-${product.sku}" min="1" value="1" style="width: 60px; padding: 4px; border: 1px solid #e2e8f0; border-radius: 4px;" />
+                            <button class="btn btn-primary" onclick="addToCart('${product.sku}')" ${product.available === 0 ? 'disabled' : ''} style="flex: 1;">
+                                Add to Cart
+                            </button>
+                        </div>
+                        <button class="btn btn-secondary" onclick="viewCart()" style="width: 100%;">
+                            View Cart
                         </button>
                     </div>
                 </div>
@@ -967,6 +976,188 @@ app.get("/catalog", async (req, res) => {
             <p style="margin-top: 0.5rem; font-size: 0.9rem;">Live data synced from inventory management system</p>
         </div>
     </div>
+
+    <!-- Cart Modal -->
+    <div id="cartModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 12px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
+            <h2 style="margin-bottom: 1rem; color: #1e3a8a;">Shopping Cart</h2>
+            <div id="cartItems"></div>
+            <div id="cartTotal" style="border-top: 2px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem;"></div>
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <button class="btn btn-secondary" onclick="closeCart()" style="flex: 1;">Continue Shopping</button>
+                <button class="btn btn-primary" onclick="showCheckout()" style="flex: 1;">Checkout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div id="checkoutModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 12px; width: 90%; max-width: 500px;">
+            <h2 style="margin-bottom: 1rem; color: #1e3a8a;">Complete Your Order</h2>
+            <form id="checkoutForm">
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #1e40af;">Order Reference *</label>
+                    <input type="text" id="orderReference" required placeholder="Enter your order reference" style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;" />
+                    <small style="color: #64748b;">This field is mandatory and will be used in your Cin7 quote</small>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #1e40af;">Company Name</label>
+                    <input type="text" id="companyName" placeholder="Your company name" style="width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;" />
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeCheckout()" style="flex: 1;">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Place Order</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let cart = [];
+
+        async function addToCart(sku) {
+            const warehouse = document.getElementById('warehouse-' + sku).value;
+            const quantity = parseInt(document.getElementById('qty-' + sku).value);
+            
+            if (!warehouse) {
+                alert('Please select a warehouse');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/cart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sku, quantity, warehouse, productId: 1 })
+                });
+                
+                if (response.ok) {
+                    alert('Item added to cart successfully!');
+                    loadCart();
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + error.error);
+                }
+            } catch (error) {
+                alert('Error adding item to cart');
+            }
+        }
+
+        async function loadCart() {
+            try {
+                const response = await fetch('/api/cart');
+                const cartData = await response.json();
+                cart = cartData.items;
+                updateCartDisplay();
+            } catch (error) {
+                console.error('Error loading cart:', error);
+            }
+        }
+
+        function updateCartDisplay() {
+            const cartItems = document.getElementById('cartItems');
+            const cartTotal = document.getElementById('cartTotal');
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<p style="text-align: center; color: #64748b;">Your cart is empty</p>';
+                cartTotal.innerHTML = '';
+                return;
+            }
+            
+            cartItems.innerHTML = cart.map(item => \`
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 0.5rem;">
+                    <div>
+                        <strong>\${item.sku}</strong><br>
+                        <small>\${item.warehouse} • Qty: \${item.quantity}</small>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-weight: 600;">ZAR \${(item.price * item.quantity).toFixed(2)}</div>
+                        <button onclick="removeFromCart('\${item.id}')" style="color: #dc2626; background: none; border: none; cursor: pointer; font-size: 0.8rem;">Remove</button>
+                    </div>
+                </div>
+            \`).join('');
+            
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            cartTotal.innerHTML = \`
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="font-size: 1.2rem;">Total: ZAR \${total.toFixed(2)}</strong>
+                    <span style="color: #64748b;">(\${cart.length} items)</span>
+                </div>
+            \`;
+        }
+
+        async function removeFromCart(itemId) {
+            try {
+                const response = await fetch('/api/cart/' + itemId, { method: 'DELETE' });
+                if (response.ok) {
+                    loadCart();
+                }
+            } catch (error) {
+                console.error('Error removing item:', error);
+            }
+        }
+
+        function viewCart() {
+            loadCart();
+            document.getElementById('cartModal').style.display = 'block';
+        }
+
+        function closeCart() {
+            document.getElementById('cartModal').style.display = 'none';
+        }
+
+        function showCheckout() {
+            if (cart.length === 0) {
+                alert('Your cart is empty');
+                return;
+            }
+            document.getElementById('checkoutModal').style.display = 'block';
+        }
+
+        function closeCheckout() {
+            document.getElementById('checkoutModal').style.display = 'none';
+        }
+
+        document.getElementById('checkoutForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const orderReference = document.getElementById('orderReference').value.trim();
+            const companyName = document.getElementById('companyName').value.trim();
+            
+            if (!orderReference) {
+                alert('Order reference is mandatory');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderReference,
+                        customerDetails: { companyName }
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Order placed successfully!\\n\\nOrder Reference: ' + result.orderReference + '\\nCin7 Quote ID: ' + result.cin7QuoteId + '\\nTotal: ZAR ' + result.total + '\\n\\nYour order has been created as an unauthorized quote in Cin7.');
+                    closeCheckout();
+                    closeCart();
+                    cart = [];
+                    updateCartDisplay();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error placing order. Please try again.');
+            }
+        });
+
+        // Load cart on page load
+        loadCart();
+    </script>
 </body>
 </html>
     `);
@@ -975,6 +1166,129 @@ app.get("/catalog", async (req, res) => {
   } catch (error: any) {
     log(`Error generating catalog: ${error.message}`);
     res.status(500).send("Error loading product catalog");
+  }
+});
+
+// Cart management - Simple in-memory storage for development
+let cartStore = new Map();
+
+app.get("/api/cart", (req, res) => {
+  const cartItems = Array.from(cartStore.values());
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalValue = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  res.json({
+    items: cartItems,
+    totalItems,
+    totalValue: totalValue.toFixed(2),
+    currency: "ZAR"
+  });
+});
+
+app.post("/api/cart", (req, res) => {
+  const { sku, quantity, warehouse, productId } = req.body;
+  
+  if (!sku || !quantity || !warehouse) {
+    return res.status(400).json({ error: "SKU, quantity, and warehouse are required" });
+  }
+  
+  const cartKey = `${sku}-${warehouse}`;
+  const existingItem = cartStore.get(cartKey);
+  
+  if (existingItem) {
+    existingItem.quantity += quantity;
+  } else {
+    cartStore.set(cartKey, {
+      id: cartKey,
+      sku,
+      productId,
+      quantity,
+      warehouse,
+      price: 299.99, // Would come from Cin7 pricing tiers
+      currency: "ZAR",
+      addedAt: new Date().toISOString()
+    });
+  }
+  
+  log(`Added to cart: ${quantity}x ${sku} from ${warehouse}`);
+  res.json({ success: true, message: "Item added to cart" });
+});
+
+app.delete("/api/cart/:id", (req, res) => {
+  const { id } = req.params;
+  const deleted = cartStore.delete(id);
+  
+  if (deleted) {
+    log(`Removed from cart: ${id}`);
+    res.json({ success: true, message: "Item removed from cart" });
+  } else {
+    res.status(404).json({ error: "Item not found in cart" });
+  }
+});
+
+// Checkout - Creates unauthorized quote in Cin7 with mandatory order reference
+app.post("/api/checkout", async (req, res) => {
+  try {
+    const { orderReference, customerDetails, deliveryAddress } = req.body;
+    
+    // Mandatory order reference validation
+    if (!orderReference || orderReference.trim() === "") {
+      return res.status(400).json({ error: "Order reference is mandatory and cannot be empty" });
+    }
+    
+    const cartItems = Array.from(cartStore.values());
+    if (cartItems.length === 0) {
+      return res.status(400).json({ error: "Cart is empty" });
+    }
+    
+    log(`Processing checkout for order reference: ${orderReference}`);
+    
+    // Prepare quote data for Cin7 Core - will create as UNAUTHORISED quote
+    const quoteData = {
+      CustomerName: customerDetails?.companyName || "B2B Portal Customer",
+      CustomerID: customerDetails?.id || null,
+      Status: "UNAUTHORISED", // Ensures quote requires authorization in Cin7
+      OrderNumber: orderReference,
+      OrderDate: new Date().toISOString().split('T')[0],
+      Note: `B2B Portal Order - Reference: ${orderReference}\\nCustomer: ${customerDetails?.companyName || 'Unknown'}`,
+      Lines: cartItems.map(item => ({
+        SKU: item.sku,
+        Name: `Product ${item.sku}`,
+        Quantity: item.quantity,
+        Price: item.price,
+        DropShip: false,
+        // Map customer-facing warehouse to actual Cin7 location
+        Location: item.warehouse.includes("JHB") ? "B-VDB" : 
+                 item.warehouse.includes("CPT") ? "B-CPT" : "S-BFN"
+      }))
+    };
+    
+    // Create unauthorized quote in Cin7 Core
+    log(`Creating unauthorized quote in Cin7: ${JSON.stringify(quoteData).substring(0, 200)}...`);
+    const result = await corePost("/Sale", quoteData);
+    
+    // Clear cart after successful order
+    cartStore.clear();
+    
+    log(`Successfully created unauthorized quote in Cin7. Quote ID: ${result.ID || 'Unknown'}`);
+    
+    res.json({
+      success: true,
+      message: "Order placed successfully as unauthorized quote in Cin7",
+      orderReference,
+      cin7QuoteId: result.ID,
+      items: cartItems.length,
+      total: cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2),
+      status: "UNAUTHORISED"
+    });
+    
+  } catch (error: any) {
+    log(`Error processing checkout: ${error.message}`);
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to process order. Please try again.",
+      details: error.message
+    });
   }
 });
 
