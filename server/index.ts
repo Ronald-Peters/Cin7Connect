@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
 
@@ -1643,7 +1644,7 @@ app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_
 // Check if React app is available for deployment
 const reactAppPath = path.resolve(__dirname, "public");
 const reactIndexPath = path.join(reactAppPath, "index.html");
-const reactAppExists = require('fs').existsSync(reactIndexPath);
+const reactAppExists = fs.existsSync(reactIndexPath);
 
 if (reactAppExists) {
   // Deployment: Serve the built React app
