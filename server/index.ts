@@ -63,15 +63,49 @@ async function corePost(path: string, body: any) {
 }
 
 /**
- * Helper to generate product image URLs
- * For now using placeholder images, can be enhanced to fetch from Cin7 ProductAttachments
+ * Fetch product images from Cin7 Core API
+ */
+async function getProductImages(sku: string): Promise<string[]> {
+  try {
+    // Get product details from Cin7 Core Products API
+    const productData = await coreGet("/Products", { 
+      qs: { where: `SKU='${sku}'` },
+      page: 1,
+      limit: 1 
+    });
+    
+    if (productData?.Products?.length > 0) {
+      const product = productData.Products[0];
+      const images: string[] = [];
+      
+      // Check for product images in the Images array
+      if (product.Images && Array.isArray(product.Images)) {
+        product.Images.forEach((img: any) => {
+          if (img.URL) {
+            images.push(img.URL);
+          }
+        });
+      }
+      
+      // Return images if available
+      if (images.length > 0) {
+        return images;
+      }
+    }
+    
+    // Fallback to placeholder if no images found
+    return [];
+  } catch (error) {
+    // Fallback to placeholder on error
+    return [];
+  }
+}
+
+/**
+ * Helper to generate product image URLs - using placeholders but will be replaced with real Cin7 images
  */
 function getProductImageUrl(sku: string, productName: string): string {
-  // Generate consistent placeholder images based on product type
-  if (productName?.toLowerCase().includes('tyre') || productName?.toLowerCase().includes('tire')) {
-    return `https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=${encodeURIComponent(sku)}`;
-  }
-  // Default product image
+  // Placeholder image for immediate display
   return `https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=${encodeURIComponent(sku)}`;
 }
 
@@ -184,22 +218,30 @@ app.get("/api/products", async (req, res) => {
       }
     });
     
-    // Convert map to array and format for frontend
-    const products = Array.from(productMap.values()).slice(0, 10).map((item: any, index: number) => ({
-      id: index + 1,
-      sku: item.sku || `REI00${index + 1}`,
-      name: item.name || `Product ${index + 1}`,
-      description: `${item.name || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
-      price: 299.99, // Pricing would come from Cin7 price tiers
-      currency: "ZAR",
-      available: item.available,
-      onHand: item.onHand,
-      onOrder: item.onOrder,
-      warehouseBreakdown: item.warehouseBreakdown,
-      // Product image support - using placeholder for now, will be populated from Cin7
-      imageUrl: getProductImageUrl(item.sku, item.name),
-      images: [] // Additional product images would be loaded here
-    }));
+    // Convert map to array and format for frontend - now with real Cin7 images
+    const products = await Promise.all(
+      Array.from(productMap.values()).slice(0, 10).map(async (item: any, index: number) => {
+        // Fetch real product images from Cin7
+        const images = await getProductImages(item.sku);
+        const primaryImage = images.length > 0 ? images[0] : getProductImageUrl(item.sku, item.name);
+        
+        return {
+          id: index + 1,
+          sku: item.sku || `REI00${index + 1}`,
+          name: item.name || `Product ${index + 1}`,
+          description: `${item.name || 'Product'} - Quality assured by Reivilo's 45 years of excellence`,
+          price: 299.99, // Pricing would come from Cin7 price tiers
+          currency: "ZAR",
+          available: item.available,
+          onHand: item.onHand,
+          onOrder: item.onOrder,
+          warehouseBreakdown: item.warehouseBreakdown,
+          // Real product images from Cin7 Core
+          imageUrl: primaryImage,
+          images: images // Additional product images
+        };
+      })
+    );
     
     res.json({
       products,
@@ -586,7 +628,21 @@ app.get("/catalog", async (req, res) => {
       }
     });
     
-    const products = Array.from(productMap.values()).slice(0, 12);
+    // Fetch real product images and prepare product data
+    const productsWithImages = await Promise.all(
+      Array.from(productMap.values()).slice(0, 12).map(async (item: any) => {
+        const images = await getProductImages(item.sku);
+        const primaryImage = images.length > 0 ? images[0] : null;
+        
+        return {
+          ...item,
+          imageUrl: primaryImage,
+          images: images
+        };
+      })
+    );
+    
+    const products = productsWithImages;
     
     res.setHeader('Content-Type', 'text/html');
     res.send(`
@@ -832,9 +888,13 @@ app.get("/catalog", async (req, res) => {
             ${products.map(product => `
                 <div class="product-card ${product.available === 0 ? 'no-stock' : ''}">
                     <div class="product-header">
-                        <div class="product-image">
-                            ${product.sku.substring(0, 2)}
-                        </div>
+                        ${product.imageUrl ? `
+                            <img src="${product.imageUrl}" alt="${product.name}" class="product-image-real" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover; border: 2px solid #e2e8f0;" />
+                        ` : `
+                            <div class="product-image">
+                                ${product.sku.substring(0, 2)}
+                            </div>
+                        `}
                         <div class="product-info">
                             <h3>${product.name}</h3>
                             <div class="product-sku">SKU: ${product.sku}</div>
