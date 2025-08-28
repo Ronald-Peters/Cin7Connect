@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import fetch from "node-fetch";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
+import { registerRoutes } from "./routes";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +19,9 @@ app.use(express.urlencoded({ extended: false }));
 
 // Setup authentication system for client login
 setupAuth(app);
+
+// Register all API routes
+registerRoutes(app);
 
 app.use((req, res, next) => {
   const start = Date.now();
