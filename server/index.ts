@@ -1682,25 +1682,103 @@ app.post("/api/checkout", async (req, res) => {
 // Serve static assets including logo
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
+// In production, serve built static files
+if (process.env.NODE_ENV === 'production') {
+  const publicPath = path.resolve(__dirname, "./public");
+  app.use(express.static(publicPath));
+  log(`📁 Serving static files from: ${publicPath}`);
+}
+
 // Serve demo page as default
 app.get("/", (req, res) => {
-  res.setHeader('Content-Type', 'text/html');
-  res.sendFile(path.resolve(__dirname, "../client/demo.html"));
+  try {
+    res.setHeader('Content-Type', 'text/html');
+    
+    // In production, serve from dist/public, in development from client
+    const demoPath = process.env.NODE_ENV === 'production' 
+      ? path.resolve(__dirname, "./public/index.html")
+      : path.resolve(__dirname, "../client/demo.html");
+    
+    log(`📄 Serving home page from: ${demoPath}`);
+    
+    res.sendFile(demoPath, (err) => {
+      if (err) {
+        log(`❌ Error serving home page: ${err.message}`);
+        // Fallback to client demo.html if production file missing
+        if (process.env.NODE_ENV === 'production') {
+          const fallbackPath = path.resolve(__dirname, "../client/demo.html");
+          res.sendFile(fallbackPath, (fallbackErr) => {
+            if (fallbackErr) {
+              log(`❌ Fallback also failed: ${fallbackErr.message}`);
+              res.status(500).send('Internal Server Error - Home page not found');
+            }
+          });
+        } else {
+          res.status(500).send('Internal Server Error - Demo page not found');
+        }
+      }
+    });
+  } catch (error: any) {
+    log(`❌ Error in / route: ${error.message}`);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 // Catch all handler for client-side routing
 app.get("*", (req, res) => {
-  if (!req.path.startsWith('/api') && !req.path.includes('.')) {
-    res.sendFile(path.resolve(__dirname, "../client/demo.html"));
-  } else {
-    res.status(404).send('Not found');
+  try {
+    if (!req.path.startsWith('/api') && !req.path.includes('.')) {
+      // In production, serve from dist/public, in development from client
+      const demoPath = process.env.NODE_ENV === 'production' 
+        ? path.resolve(__dirname, "./public/index.html")
+        : path.resolve(__dirname, "../client/demo.html");
+      
+      res.sendFile(demoPath, (err) => {
+        if (err) {
+          log(`❌ Error serving ${req.path}: ${err.message}`);
+          // Fallback to client demo.html if production file missing
+          if (process.env.NODE_ENV === 'production') {
+            const fallbackPath = path.resolve(__dirname, "../client/demo.html");
+            res.sendFile(fallbackPath, (fallbackErr) => {
+              if (fallbackErr) {
+                log(`❌ Fallback failed for ${req.path}: ${fallbackErr.message}`);
+                res.status(404).send('Page not found');
+              }
+            });
+          } else {
+            res.status(404).send('Page not found');
+          }
+        }
+      });
+    } else {
+      res.status(404).send('Not found');
+    }
+  } catch (error: any) {
+    log(`❌ Error in catch-all route: ${error.message}`);
+    res.status(500).send('Internal Server Error');
   }
 });
 
 const port = parseInt(process.env.PORT || '5000', 10);
+
+// Handle uncaught exceptions and promise rejections for production stability
+process.on('uncaughtException', (error) => {
+  log(`❌ Uncaught Exception: ${error.message}`);
+  console.error(error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  log(`❌ Unhandled Rejection at: ${promise}, reason: ${reason}`);
+  console.error(reason);
+  process.exit(1);
+});
+
 app.listen(port, "0.0.0.0", () => {
   log(`🚀 Reivilo B2B Portal running on port ${port}`);
   log(`📈 45 Years of Family Business Values Since 1980`);
   log(`🌐 Visit: http://localhost:${port}`);
   log(`🧪 Test App: http://localhost:${port}/app`);
+  log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  log(`🔑 Secrets loaded: ${process.env.CIN7_ACCOUNT_ID ? '✓' : '✗'} CIN7, ${process.env.DATABASE_URL ? '✓' : '✗'} DB`);
 });
