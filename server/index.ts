@@ -618,12 +618,13 @@ app.get("/app", (req, res) => {
 app.get("/catalog", async (req, res) => {
   try {
     log("Loading live product catalog from Cin7...");
-    const data = await coreGet("/ProductAvailability", { page: 1, limit: 20 });
+    // Get more data to ensure we capture all warehouse locations
+    const data = await coreGet("/ProductAvailability", { page: 1, limit: 200 });
+    
+    const availabilityArray = data.ProductAvailability || [];
     
     // Filter to only allowed warehouse locations
     const allowedWarehouses = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"];
-    const availabilityArray = data.ProductAvailability || [];
-    
     const filteredAvailability = availabilityArray.filter((item: any) => 
       allowedWarehouses.includes(item.Location)
     );
