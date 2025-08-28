@@ -105,15 +105,9 @@ app.get("/api/cart", (req, res) => {
   res.json({ items: [], location: "Cape Town Main" });
 });
 
-// Serve specific assets from client directory 
+// Serve assets only, not HTML files
 app.use('/attached_assets', express.static(path.resolve(__dirname, "../attached_assets")));
-app.use('/src', express.static(path.resolve(__dirname, "../client/src"), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.js') || path.endsWith('.jsx') || path.endsWith('.ts') || path.endsWith('.tsx')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    }
-  }
-}));
+
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -121,13 +115,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const message = err.message || "Internal Server Error";
   res.status(status).json({ message });
   log(`Error: ${message}`);
-});
-
-// Handle module imports
-app.get('/src/*', (req, res) => {
-  const filePath = path.resolve(__dirname, "../client", req.path.slice(1));
-  res.setHeader('Content-Type', 'application/javascript');
-  res.sendFile(filePath);
 });
 
 // Serve demo page as default
