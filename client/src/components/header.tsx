@@ -20,7 +20,7 @@ export function Header() {
   };
 
   const navItems = [
-    { path: "/", label: "Catalog", icon: Package },
+    { path: "/catalog", label: "Catalog", icon: Package },
     { path: "/cart", label: "Cart", icon: ShoppingCart },
     { path: "/profile", label: "Profile", icon: User },
     ...(user?.role === 'admin' ? [{ path: "/admin", label: "Admin", icon: Shield }] : []),
@@ -33,16 +33,16 @@ export function Header() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
               <img 
-                src="@assets/IMG-20240703-WA0009_1756368997024.jpg" 
+                src="@assets/generated_images/Professional_Reivilo_web_logo_afb70425.png" 
                 alt="Reivilo Logo" 
                 className="h-10 w-auto cursor-pointer"
-                onClick={() => setLocation("/")}
+                onClick={() => setLocation("/catalog")}
                 data-testid="img-logo"
               />
               <div className="flex flex-col">
                 <h1 
                   className="text-lg font-bold text-primary cursor-pointer leading-tight" 
-                  onClick={() => setLocation("/")}
+                  onClick={() => setLocation("/catalog")}
                   data-testid="text-logo"
                 >
                   Reivilo B2B

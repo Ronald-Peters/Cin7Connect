@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Welcome back!",
         description: "You have been successfully logged in.",
       });
+      // Redirect to catalog after successful login
+      window.location.href = "/catalog";
     },
     onError: (error: Error) => {
       toast({

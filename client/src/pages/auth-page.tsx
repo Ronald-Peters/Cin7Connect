@@ -16,7 +16,7 @@ export default function AuthPage() {
 
   // Redirect if already logged in
   if (user) {
-    setLocation("/");
+    setLocation("/catalog");
     return null;
   }
 
@@ -44,7 +44,7 @@ export default function AuthPage() {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center space-x-4 mb-4">
               <img 
-                src="@assets/IMG-20240703-WA0009_1756368997024.jpg" 
+                src="@assets/generated_images/Professional_Reivilo_web_logo_afb70425.png" 
                 alt="Reivilo Logo" 
                 className="h-16 w-auto"
                 data-testid="img-logo"
@@ -162,7 +162,7 @@ export default function AuthPage() {
           <div className="mb-8">
             <div className="inline-flex items-center justify-center w-24 h-24 bg-reivilo-purple/15 rounded-full mb-6 border-2 border-reivilo-purple/20">
               <img 
-                src="@assets/IMG-20240703-WA0009_1756368997024.jpg" 
+                src="@assets/generated_images/Professional_Reivilo_web_logo_afb70425.png" 
                 alt="Reivilo 45 Years" 
                 className="h-16 w-auto opacity-80"
               />
