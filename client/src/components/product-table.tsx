@@ -20,6 +20,9 @@ interface Product {
   onOrder: number;
   imageUrl: string;
   images: string[];
+  brand?: string;
+  barcode?: string;
+  category?: string;
   warehouseBreakdown: {
     jhb: { available: number; onHand: number; onOrder: number };
     cpt: { available: number; onHand: number; onOrder: number };
@@ -39,6 +42,9 @@ interface ProductsResponse {
   products: Product[];
   total: number;
   filteredWarehouses: string[];
+  page?: number;
+  totalPages?: number;
+  pageSize?: number;
 }
 
 export function ProductTable() {
@@ -258,7 +264,7 @@ export function ProductTable() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <WarehouseStockDisplay availability={availability} />
+                          <WarehouseStockDisplay availability={warehouseStock} />
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center space-x-2">
