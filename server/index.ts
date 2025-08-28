@@ -1790,16 +1790,18 @@ app.get("/", (req, res) => {
   try {
     res.setHeader('Content-Type', 'text/html');
     
-    // Always serve the approved demo.html for home page (locked layout)
-    const demoPath = path.resolve(__dirname, "../client/demo.html");
+    // In production, serve from dist/public, in development from client
+    const demoPath = process.env.NODE_ENV === 'production' 
+      ? path.resolve(__dirname, "./public/demo.html")
+      : path.resolve(__dirname, "../client/demo.html");
     
     log(`📄 Serving locked home page from: ${demoPath}`);
     
     res.sendFile(demoPath, (err) => {
       if (err) {
         log(`❌ Error serving locked home page: ${err.message}`);
-        // If demo.html not found, check if it exists in current directory
-        const fallbackDemo = path.resolve(__dirname, "./demo.html");
+        // Fallback to client demo.html if production file missing
+        const fallbackDemo = path.resolve(__dirname, "../client/demo.html");
         res.sendFile(fallbackDemo, (fallbackErr) => {
           if (fallbackErr) {
             log(`❌ Fallback demo failed: ${fallbackErr.message}`);
