@@ -1,15 +1,418 @@
-var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
-  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
-}) : x)(function(x) {
-  if (typeof require !== "undefined") return require.apply(this, arguments);
-  throw Error('Dynamic require of "' + x + '" is not supported');
-});
+var __defProp = Object.defineProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 
 // server/index.ts
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
+
+// server/auth.ts
+import passport from "passport";
+import { Strategy as LocalStrategy } from "passport-local";
+import session2 from "express-session";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+
+// shared/schema.ts
+var schema_exports = {};
+__export(schema_exports, {
+  availability: () => availability,
+  availabilityRelations: () => availabilityRelations,
+  customers: () => customers,
+  customersRelations: () => customersRelations,
+  insertAvailabilitySchema: () => insertAvailabilitySchema,
+  insertCustomerSchema: () => insertCustomerSchema,
+  insertProductSchema: () => insertProductSchema,
+  insertQuoteSchema: () => insertQuoteSchema,
+  insertUserSchema: () => insertUserSchema,
+  insertWarehouseSchema: () => insertWarehouseSchema,
+  products: () => products,
+  productsRelations: () => productsRelations,
+  quotes: () => quotes,
+  users: () => users,
+  usersRelations: () => usersRelations,
+  warehouses: () => warehouses,
+  warehousesRelations: () => warehousesRelations
+});
+import { sql, relations } from "drizzle-orm";
+import { pgTable, text, varchar, integer, numeric, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+var users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  customerId: integer("customer_id").references(() => customers.id),
+  role: text("role").default("buyer"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+var customers = pgTable("customers", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  erpCustomerId: text("erp_customer_id").unique(),
+  companyName: text("company_name"),
+  terms: text("terms"),
+  priceTier: text("price_tier"),
+  defaultAddress: text("default_address"),
+  billingAddress: text("billing_address"),
+  shippingAddress: text("shipping_address"),
+  contacts: jsonb("contacts"),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+var products = pgTable("products", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  sku: text("sku").unique().notNull(),
+  name: text("name"),
+  barcode: text("barcode"),
+  brand: text("brand"),
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+var warehouses = pgTable("warehouses", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  cin7LocationName: text("cin7_location_name").unique().notNull()
+});
+var availability = pgTable("availability", {
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }),
+  warehouseId: integer("warehouse_id").references(() => warehouses.id, { onDelete: "cascade" }),
+  onHand: numeric("on_hand").default("0"),
+  allocated: numeric("allocated").default("0"),
+  available: numeric("available").default("0"),
+  onOrder: numeric("on_order").default("0")
+}, (table) => ({
+  pk: sql`PRIMARY KEY (${table.productId}, ${table.warehouseId})`
+}));
+var quotes = pgTable("quotes", {
+  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
+  erpSaleId: text("erp_sale_id"),
+  status: text("status"),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+var usersRelations = relations(users, ({ one }) => ({
+  customer: one(customers, { fields: [users.customerId], references: [customers.id] })
+}));
+var customersRelations = relations(customers, ({ many }) => ({
+  users: many(users)
+}));
+var productsRelations = relations(products, ({ many }) => ({
+  availability: many(availability)
+}));
+var warehousesRelations = relations(warehouses, ({ many }) => ({
+  availability: many(availability)
+}));
+var availabilityRelations = relations(availability, ({ one }) => ({
+  product: one(products, { fields: [availability.productId], references: [products.id] }),
+  warehouse: one(warehouses, { fields: [availability.warehouseId], references: [warehouses.id] })
+}));
+var insertUserSchema = createInsertSchema(users).pick({
+  email: true,
+  password: true
+});
+var insertCustomerSchema = createInsertSchema(customers);
+var insertProductSchema = createInsertSchema(products);
+var insertWarehouseSchema = createInsertSchema(warehouses);
+var insertAvailabilitySchema = createInsertSchema(availability);
+var insertQuoteSchema = createInsertSchema(quotes);
+
+// server/db.ts
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
+neonConfig.webSocketConstructor = ws;
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL must be set. Did you forget to provision a database?"
+  );
+}
+var pool = new Pool({ connectionString: process.env.DATABASE_URL });
+var db = drizzle({ client: pool, schema: schema_exports });
+
+// server/storage.ts
+import { eq, ilike, and, asc, sql as sql2 } from "drizzle-orm";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+var PostgresSessionStore = connectPg(session);
+var DatabaseStorage = class {
+  sessionStore;
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true
+    });
+  }
+  async getUser(id) {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || void 0;
+  }
+  async getUserByEmail(email) {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || void 0;
+  }
+  async createUser(userData) {
+    const [user] = await db.insert(users).values({
+      email: userData.email,
+      password: userData.password,
+      customerId: userData.customerId
+    }).returning();
+    return user;
+  }
+  async getCustomerById(id) {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer || void 0;
+  }
+  async getCustomerByErpId(erpId) {
+    const [customer] = await db.select().from(customers).where(eq(customers.erpCustomerId, erpId));
+    return customer || void 0;
+  }
+  async upsertCustomer(customerData) {
+    if (customerData.id) {
+      const [updated] = await db.update(customers).set(customerData).where(eq(customers.id, customerData.id)).returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(customers).values(customerData).returning();
+      return created;
+    }
+  }
+  async getProducts(search, page = 1, pageSize = 50) {
+    const offset = (page - 1) * pageSize;
+    let whereCondition = void 0;
+    if (search) {
+      whereCondition = ilike(products.name, `%${search}%`);
+    }
+    const [productsResult, countResult] = await Promise.all([
+      db.select().from(products).where(whereCondition).orderBy(asc(products.name)).limit(pageSize).offset(offset),
+      db.select({ count: sql2`count(*)` }).from(products).where(whereCondition)
+    ]);
+    return {
+      products: productsResult,
+      total: countResult[0]?.count || 0
+    };
+  }
+  async getProductById(id) {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product || void 0;
+  }
+  async getProductBySku(sku) {
+    const [product] = await db.select().from(products).where(eq(products.sku, sku));
+    return product || void 0;
+  }
+  async upsertProduct(productData) {
+    if (productData.sku) {
+      const existing = await this.getProductBySku(productData.sku);
+      if (existing) {
+        const [updated] = await db.update(products).set(productData).where(eq(products.sku, productData.sku)).returning();
+        return updated;
+      }
+    }
+    const [created] = await db.insert(products).values(productData).returning();
+    return created;
+  }
+  async getWarehouses() {
+    return await db.select().from(warehouses).orderBy(asc(warehouses.cin7LocationName));
+  }
+  async getWarehouseById(id) {
+    const [warehouse] = await db.select().from(warehouses).where(eq(warehouses.id, id));
+    return warehouse || void 0;
+  }
+  async upsertWarehouse(warehouseData) {
+    if (warehouseData.cin7LocationName) {
+      const [existing] = await db.select().from(warehouses).where(eq(warehouses.cin7LocationName, warehouseData.cin7LocationName));
+      if (existing) {
+        const [updated] = await db.update(warehouses).set(warehouseData).where(eq(warehouses.cin7LocationName, warehouseData.cin7LocationName)).returning();
+        return updated;
+      }
+    }
+    const [created] = await db.insert(warehouses).values(warehouseData).returning();
+    return created;
+  }
+  async getAvailabilityByProductIds(productIds) {
+    if (productIds.length === 0) return [];
+    return await db.select({
+      productId: availability.productId,
+      warehouseId: availability.warehouseId,
+      onHand: availability.onHand,
+      allocated: availability.allocated,
+      available: availability.available,
+      onOrder: availability.onOrder,
+      warehouse: warehouses
+    }).from(availability).innerJoin(warehouses, eq(availability.warehouseId, warehouses.id)).where(sql2`${availability.productId} = ANY(ARRAY[${productIds.join(",")}])`);
+  }
+  async upsertAvailability(availabilityData) {
+    if (availabilityData.productId && availabilityData.warehouseId) {
+      const [existing] = await db.select().from(availability).where(
+        and(
+          eq(availability.productId, availabilityData.productId),
+          eq(availability.warehouseId, availabilityData.warehouseId)
+        )
+      );
+      if (existing) {
+        const [updated] = await db.update(availability).set(availabilityData).where(
+          and(
+            eq(availability.productId, availabilityData.productId),
+            eq(availability.warehouseId, availabilityData.warehouseId)
+          )
+        ).returning();
+        return updated;
+      }
+    }
+    const [created] = await db.insert(availability).values(availabilityData).returning();
+    return created;
+  }
+  async createQuote(quoteData) {
+    const [quote] = await db.insert(quotes).values(quoteData).returning();
+    return quote;
+  }
+  async getQuotesByCustomerId(customerId) {
+    return [];
+  }
+};
+var storage = new DatabaseStorage();
+
+// server/auth.ts
+var scryptAsync = promisify(scrypt);
+async function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const buf = await scryptAsync(password, salt, 64);
+  return `${buf.toString("hex")}.${salt}`;
+}
+async function comparePasswords(supplied, stored) {
+  const [hashed, salt] = stored.split(".");
+  const hashedBuf = Buffer.from(hashed, "hex");
+  const suppliedBuf = await scryptAsync(supplied, salt, 64);
+  return timingSafeEqual(hashedBuf, suppliedBuf);
+}
+function setupAuth(app2) {
+  const sessionSettings = {
+    secret: process.env.SESSION_SECRET || "reivilo-b2b-secret-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    store: storage.sessionStore,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1e3
+      // 24 hours
+    }
+  };
+  if (process.env.NODE_ENV === "production") {
+    app2.set("trust proxy", 1);
+  }
+  app2.use(session2(sessionSettings));
+  app2.use(passport.initialize());
+  app2.use(passport.session());
+  passport.use(
+    new LocalStrategy(
+      { usernameField: "email" },
+      async (email, password, done) => {
+        try {
+          const user = await storage.getUserByEmail(email);
+          if (!user || !await comparePasswords(password, user.password)) {
+            return done(null, false);
+          } else {
+            return done(null, user);
+          }
+        } catch (error) {
+          return done(error);
+        }
+      }
+    )
+  );
+  passport.serializeUser((user, done) => done(null, user.id));
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const user = await storage.getUser(id);
+      done(null, user);
+    } catch (error) {
+      done(error);
+    }
+  });
+  app2.post("/api/register", async (req, res, next) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      const user = await storage.createUser({
+        email,
+        password: await hashPassword(password)
+      });
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(201).json({
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          customerId: user.customerId
+        });
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  app2.post("/api/login", passport.authenticate("local"), async (req, res) => {
+    try {
+      const user = req.user;
+      let customer = null;
+      if (user.customerId) {
+        customer = await storage.getCustomerById(user.customerId);
+      }
+      res.status(200).json({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        customerId: user.customerId,
+        customer: customer ? {
+          id: customer.id,
+          companyName: customer.companyName,
+          priceTier: customer.priceTier,
+          terms: customer.terms
+        } : null
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user details" });
+    }
+  });
+  app2.post("/api/logout", (req, res, next) => {
+    req.logout((err) => {
+      if (err) return next(err);
+      res.sendStatus(200);
+    });
+  });
+  app2.get("/api/user", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const user = req.user;
+      let customer = null;
+      if (user.customerId) {
+        customer = await storage.getCustomerById(user.customerId);
+      }
+      res.json({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        customerId: user.customerId,
+        customer: customer ? {
+          id: customer.id,
+          companyName: customer.companyName,
+          priceTier: customer.priceTier,
+          terms: customer.terms
+        } : null
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user details" });
+    }
+  });
+}
+
+// server/index.ts
 var __dirname = path.dirname(fileURLToPath(import.meta.url));
 function log(message) {
   console.log(`[${(/* @__PURE__ */ new Date()).toISOString()}] ${message}`);
@@ -17,6 +420,7 @@ function log(message) {
 var app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+setupAuth(app);
 app.use((req, res, next) => {
   const start = Date.now();
   const path2 = req.path;
@@ -51,8 +455,8 @@ async function corePost(path2, body) {
   const url = `${CORE_BASE_URL}${path2}`;
   const res = await fetch(url, { method: "POST", headers: CORE_HEADERS(), body: JSON.stringify(body) });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Core POST ${url} failed (${res.status}): ${text}`);
+    const text2 = await res.text();
+    throw new Error(`Core POST ${url} failed (${res.status}): ${text2}`);
   }
   return res.json();
 }
@@ -158,8 +562,8 @@ async function coreGet(path2, { page = 1, limit, qs = {} } = {}) {
   for (const [k, v] of Object.entries(qs)) if (v !== void 0 && v !== null) url.searchParams.set(k, String(v));
   const res = await fetch(url.toString(), { headers: CORE_HEADERS() });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Core GET ${url} failed (${res.status}): ${text}`);
+    const text2 = await res.text();
+    throw new Error(`Core GET ${url} failed (${res.status}): ${text2}`);
   }
   return res.json();
 }
@@ -285,7 +689,7 @@ app.get("/api/products", async (req, res) => {
         log(`Mapped ${sku} to category: ${category}`);
       }
     }
-    const products = await Promise.all(
+    const products2 = await Promise.all(
       Array.from(productMap.values()).map(async (item, index) => {
         const images = await getProductImages(item.sku);
         const primaryImage = images.length > 0 ? images[0] : getProductImageUrl(item.sku, item.name);
@@ -312,11 +716,11 @@ app.get("/api/products", async (req, res) => {
       })
     );
     res.json({
-      products,
-      total: products.length,
+      products: products2,
+      total: products2.length,
       filteredWarehouses: allowedWarehouses
     });
-    log(`Successfully returned ${products.length} products with filtered warehouse stock from ${filteredAvailability.length} availability records`);
+    log(`Successfully returned ${products2.length} products with filtered warehouse stock from ${filteredAvailability.length} availability records`);
   } catch (error) {
     log(`Error fetching products: ${error.message}`);
     res.status(500).json({ error: "Failed to fetch products from inventory system" });
@@ -380,7 +784,7 @@ app.get("/api/availability", async (req, res) => {
         (item) => item.SKU === productSku
       );
     }
-    const availability = filteredAvailability.map((item) => {
+    const availability2 = filteredAvailability.map((item) => {
       let warehouseGroup = "";
       let warehouseId = 0;
       if (["B-VDB", "S-POM"].includes(item.Location)) {
@@ -405,8 +809,8 @@ app.get("/api/availability", async (req, res) => {
         stockValue: item.StockOnHand || 0
       };
     });
-    res.json(availability);
-    log(`Successfully returned ${availability.length} availability records from filtered warehouses`);
+    res.json(availability2);
+    log(`Successfully returned ${availability2.length} availability records from filtered warehouses`);
   } catch (error) {
     log(`Error fetching availability: ${error.message}`);
     res.status(500).json({ error: "Failed to fetch stock availability" });
@@ -773,7 +1177,7 @@ app.get("/catalog", async (req, res) => {
         });
       }
     }
-    const products = productsWithImages;
+    const products2 = productsWithImages;
     res.setHeader("Content-Type", "text/html");
     res.send(`
 <!DOCTYPE html>
@@ -1012,7 +1416,7 @@ app.get("/catalog", async (req, res) => {
 
         <div class="stats-bar">
             <div class="stat">
-                <div class="stat-number">${products.length}</div>
+                <div class="stat-number">${products2.length}</div>
                 <div class="stat-label">Products Available</div>
             </div>
             <div class="stat">
@@ -1026,7 +1430,7 @@ app.get("/catalog", async (req, res) => {
         </div>
 
         <div class="products-grid">
-            ${products.map((product) => `
+            ${products2.map((product) => `
                 <div class="product-card ${product.available === 0 ? "no-stock" : ""}">
                     <div class="product-header">
                         ${product.imageUrl ? `
@@ -1313,7 +1717,7 @@ app.get("/catalog", async (req, res) => {
 </body>
 </html>
     `);
-    log(`Successfully generated product catalog with ${products.length} live products`);
+    log(`Successfully generated product catalog with ${products2.length} live products`);
   } catch (error) {
     log(`Error generating catalog: ${error.message}`);
     res.status(500).send("Error loading product catalog");
@@ -1418,46 +1822,36 @@ app.post("/api/checkout", async (req, res) => {
   }
 });
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
-if (process.env.NODE_ENV === "production") {
-  const publicPaths = [
-    path.resolve(__dirname, "public"),
-    path.resolve(__dirname, "../dist/public"),
-    path.resolve(__dirname, "../../dist/public")
-  ];
-  let staticPath = publicPaths[0];
-  for (const testPath of publicPaths) {
-    try {
-      if (__require("fs").existsSync(testPath)) {
-        staticPath = testPath;
-        break;
-      }
-    } catch (e) {
-    }
-  }
-  log(`\u{1F5C2}\uFE0F Serving static files from: ${staticPath}`);
-  app.use(express.static(staticPath));
+var reactAppPath = path.resolve(__dirname, "public");
+var reactIndexPath = path.join(reactAppPath, "index.html");
+var reactAppExists = fs.existsSync(reactIndexPath);
+if (reactAppExists) {
+  log(`\u{1F5C2}\uFE0F Serving React app from: ${reactAppPath}`);
+  app.use(express.static(reactAppPath));
   app.get("*", (req, res) => {
-    if (!req.path.startsWith("/api") && !req.path.includes(".")) {
-      const indexPath = path.join(staticPath, "index.html");
-      if (__require("fs").existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).send("Frontend not found");
-      }
-    } else {
-      res.status(404).send("Not found");
+    if (!req.path.startsWith("/api") && !req.path.startsWith("/app")) {
+      log(`\u{1F4C4} Serving React app for route: ${req.path}`);
+      res.sendFile(reactIndexPath);
+    } else if (req.path.startsWith("/api")) {
+      res.status(404).send("API route not found");
     }
   });
 } else {
-  app.get("/", (req, res) => {
-    res.setHeader("Content-Type", "text/html");
-    res.sendFile(path.resolve(__dirname, "../client/demo.html"));
-  });
+  log(`\u26A0\uFE0F React app not found - deployment may be incomplete`);
   app.get("*", (req, res) => {
-    if (!req.path.startsWith("/api") && !req.path.includes(".")) {
-      res.sendFile(path.resolve(__dirname, "../client/demo.html"));
-    } else {
-      res.status(404).send("Not found");
+    if (!req.path.startsWith("/api") && !req.path.startsWith("/app")) {
+      res.status(503).send(`
+        <html>
+          <head><title>Reivilo B2B Portal</title></head>
+          <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h1>React App Loading...</h1>
+            <p>The React application is being deployed. Please refresh in a moment.</p>
+            <p>If this message persists, the build may be incomplete.</p>
+          </body>
+        </html>
+      `);
+    } else if (req.path.startsWith("/api")) {
+      res.status(404).send("API route not found");
     }
   });
 }
