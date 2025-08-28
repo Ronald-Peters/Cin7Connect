@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
+import { setupAuth } from "./auth";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -13,6 +14,9 @@ function log(message: string) {
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Setup authentication system for client login
+setupAuth(app);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -1688,6 +1692,32 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(publicPath));
   log(`📁 Serving static files from: ${publicPath}`);
 }
+
+// Production-ready client access routes
+app.get("/login", (req, res) => {
+  try {
+    const reactAppPath = process.env.NODE_ENV === 'production' 
+      ? path.resolve(__dirname, "./public/index.html")
+      : path.resolve(__dirname, "../dist/public/index.html");
+    
+    log(`🔐 Serving login page from: ${reactAppPath}`);
+    res.sendFile(reactAppPath, (err) => {
+      if (err) {
+        log(`❌ Error serving login: ${err.message}`);
+        res.status(500).send(`
+          <html><body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h2>🔐 Reivilo B2B Portal</h2>
+            <p>Client Login System Loading...</p>
+            <p>If this persists, contact support.</p>
+          </body></html>
+        `);
+      }
+    });
+  } catch (error: any) {
+    log(`❌ Error in /login route: ${error.message}`);
+    res.status(500).send('Login system error');
+  }
+});
 
 // Serve demo page as default
 app.get("/", (req, res) => {
