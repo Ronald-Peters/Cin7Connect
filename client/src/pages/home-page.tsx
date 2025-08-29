@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, MapPin, Clock, Shield } from "lucide-react";
+import reiviloLogo from "@/assets/reivilo-logo.jpg";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -14,16 +15,9 @@ export default function HomePage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center text-white">
             <img 
-              src="/assets/reivilo-logo.jpg" 
+              src={reiviloLogo} 
               alt="Reivilo Logo" 
               className="h-20 w-auto mx-auto mb-6"
-              onError={(e) => {
-                // Fallback to text logo
-                const fallback = document.createElement('div');
-                fallback.className = 'h-20 w-64 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white font-bold text-3xl';
-                fallback.textContent = 'REIVILO';
-                e.currentTarget.parentNode?.replaceChild(fallback, e.currentTarget);
-              }}
             />
             <h1 className="text-5xl font-bold mb-4">45 Years of Excellence</h1>
             <p className="text-xl mb-8 opacity-90">

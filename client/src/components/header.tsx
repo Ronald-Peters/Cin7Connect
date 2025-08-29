@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Package, FileText, User, LogOut, Shield, Home } from "lucide-react";
+import reiviloLogo from "@/assets/reivilo-logo.jpg";
 
 export function Header() {
   const [location, setLocation] = useLocation();
@@ -34,19 +35,11 @@ export function Header() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-3">
               <img 
-                src="/assets/reivilo-logo.jpg" 
+                src={reiviloLogo} 
                 alt="Reivilo Logo" 
                 className="h-10 w-auto cursor-pointer"
                 onClick={() => setLocation("/")}
                 data-testid="img-logo"
-                onError={(e) => {
-                  // Fallback to text logo
-                  const fallback = document.createElement('div');
-                  fallback.className = 'flex items-center justify-center h-10 w-20 bg-gradient-to-r from-[#1e3a8a] to-[#3b82f6] text-white font-bold text-sm rounded cursor-pointer';
-                  fallback.textContent = 'REIVILO';
-                  fallback.onclick = () => setLocation("/");
-                  e.currentTarget.parentNode?.replaceChild(fallback, e.currentTarget);
-                }}
               />
               <div className="flex flex-col">
                 <h1 
