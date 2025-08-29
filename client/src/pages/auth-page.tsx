@@ -16,7 +16,7 @@ export default function AuthPage() {
 
   // Redirect if already logged in
   if (user) {
-    setLocation("/catalog");
+    setLocation("/");
     return null;
   }
 
@@ -44,10 +44,14 @@ export default function AuthPage() {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center space-x-4 mb-4">
               <img 
-                src="@assets/generated_images/Professional_Reivilo_web_logo_afb70425.png" 
+                src="/reivilo-logo.jpg" 
                 alt="Reivilo Logo" 
-                className="h-16 w-auto"
+                className="h-16 w-auto object-contain"
                 data-testid="img-logo"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 68'%3E%3Ctext x='75' y='34' font-family='Arial' font-size='24' font-weight='bold' text-anchor='middle' fill='%231E3A8A'%3EReivilo%3C/text%3E%3C/svg%3E";
+                }}
               />
             </div>
             <h1 className="text-3xl font-bold text-primary mb-2" data-testid="text-app-title">
@@ -162,9 +166,13 @@ export default function AuthPage() {
           <div className="mb-8">
             <div className="inline-flex items-center justify-center w-24 h-24 bg-reivilo-purple/15 rounded-full mb-6 border-2 border-reivilo-purple/20">
               <img 
-                src="@assets/generated_images/Professional_Reivilo_web_logo_afb70425.png" 
+                src="/reivilo-logo.jpg" 
                 alt="Reivilo 45 Years" 
-                className="h-16 w-auto opacity-80"
+                className="h-16 w-auto opacity-80 object-contain"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 68'%3E%3Ctext x='75' y='34' font-family='Arial' font-size='24' font-weight='bold' text-anchor='middle' fill='%231E3A8A'%3EReivilo%3C/text%3E%3C/svg%3E";
+                }}
               />
             </div>
             <h2 className="text-3xl font-bold text-foreground mb-4" data-testid="text-hero-title">

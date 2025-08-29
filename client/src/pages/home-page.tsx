@@ -2,13 +2,16 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, MapPin, Clock, Shield } from "lucide-react";
+import { Header } from "@/components/header";
 import reiviloLogo from "@/assets/reivilo-logo.jpg";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1e3a8a] to-[#3b82f6]" data-testid="home-page">
+    <div className="min-h-screen" data-testid="home-page">
+      <Header />
+      <div className="bg-gradient-to-br from-[#1e3a8a] to-[#3b82f6]">
       {/* Hero Section */}
       <div className="relative">
         <div className="absolute inset-0 bg-black/20"></div>
@@ -135,6 +138,7 @@ export default function HomePage() {
             </Button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
