@@ -5,6 +5,7 @@ import fetch from "node-fetch";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { registerRoutes } from "./routes";
+import { initialSync, startBackgroundSync } from "./sync.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1933,4 +1934,16 @@ app.listen(port, "0.0.0.0", async () => {
   } catch (error) {
     log(`❌ Database sync failed: ${error}`);
   }
+
+  // Initial Cin7 → Supabase sync
+  try {
+    await initialSync();
+    log("✅ Initial Cin7 → Supabase sync complete");
+  } catch (error) {
+    log(`❌ Initial Cin7 → Supabase sync failed: ${error}`);
+  }
+
+  // Start background sync
+  startBackgroundSync();
+  log("🔄 Background Cin7 → Supabase sync started");
 });

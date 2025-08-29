@@ -1,0 +1,127 @@
+// sync.js
+import { db } from "./db.js";
+
+// --- Use your existing coreGet(...) if present ---
+// Comment OUT the fallback if you already have coreGet.
+async function coreGet(path, { page = 1, limit = 100, qs = {} } = {}) {
+  const base = process.env.CORE_BASE_URL || "https://inventory.dearsystems.com/ExternalApi";
+  const url = new URL(`${base}${path}`);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("limit", String(limit));
+  Object.entries(qs).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)));
+  const res = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      "api-auth-accountid": process.env.CORE_ACCOUNT_ID,
+      "api-auth-applicationkey": process.env.CORE_API_KEY,
+    },
+  });
+  if (!res.ok) throw new Error(`Cin7 Core GET ${url} -> ${res.status}`);
+  return res.json();
+}
+
+// Helper to page through everything
+async function getAll(path, opts = {}) {
+  let page = 1, out = [];
+  // some endpoints expose Total; we’ll just loop until empty
+  // (safe because we limit per page)
+  while (true) {
+    const data = await coreGet(path, { ...opts, page });
+    const arr =
+      data?.Customers ||
+      data?.Locations ||
+      data?.ProductAvailability ||
+      data?.Items ||
+      Array.isArray(data) ? data : [];
+    if (!arr || arr.length === 0) break;
+    out = out.concat(arr);
+    if (arr.length < (opts.limit || 100)) break;
+    page++;
+  }
+  return out;
+}
+
+// ---- SYNCERS ----
+export async function syncLocations() {
+  const list = await getAll("/Locations", { limit: 500 });
+  for (const l of list) {
+    const id = l.ID || l.Id || l.Guid || l.GuidID || crypto.randomUUID();
+    const name = l.Name || l.name;
+    if (!name) continue;
+    await db.query(
+      `insert into locations (id, name)
+       values ($1, $2)
+       on conflict (id) do update set name = excluded.name`,
+      [id, name]
+    );
+  }
+}
+
+export async function syncCustomers() {
+  const list = await getAll("/Customers", { limit: 500 });
+  for (const c of list) {
+    const id = c.ID || c.Id || c.Guid || c.GuidID || crypto.randomUUID();
+    await db.query(
+      `insert into customers (id, name, email, price_tier, default_location)
+       values ($1,$2,$3,$4,$5)
+       on conflict (id) do update set name=$2, email=$3, price_tier=$4, default_location=$5`,
+      [id, c.Name || c.Customer || "Unknown", c.Email || null, c.PriceTier || null, c.DefaultLocation || null]
+    );
+  }
+}
+
+export async function syncAvailabilityFor(locationName) {
+  // pull availability for ONE warehouse (by location name)
+  const items = await getAll("/ProductAvailability", { limit: 500, qs: { location: locationName } });
+  for (const it of items) {
+    const sku = it.SKU || it.Sku || it.ProductCode;
+    const name = it.ProductName || it.Name || null;
+    const brand = it.Brand || null;
+    const img = it.ImageUrl || it.ImageURL || null;
+    const onHand = it.OnHand ?? it.On_Hand ?? 0;
+    const available = it.Available ?? 0;
+    const onOrder = it.OnOrder ?? 0;
+
+    if (!sku) continue;
+
+    await db.query(
+      `insert into products (sku, name, brand, image_url)
+       values ($1,$2,$3,$4)
+       on conflict (sku) do update set name=excluded.name, brand=excluded.brand, image_url=excluded.image_url`,
+      [sku, name, brand, img]
+    );
+
+    await db.query(
+      `insert into product_availability (sku, location_name, on_hand, available, on_order, updated_at)
+       values ($1,$2,$3,$4,$5, now())
+       on conflict (sku, location_name)
+       do update set on_hand=excluded.on_hand, available=excluded.available, on_order=excluded.on_order, updated_at=now()`,
+      [sku, locationName, onHand, available, onOrder]
+    );
+  }
+}
+
+export async function syncAllAvailability() {
+  const { rows } = await db.query(`select name from locations order by name`);
+  for (const r of rows) {
+    await syncAvailabilityFor(r.name);
+  }
+}
+
+// One-shot full sync you can call at startup
+export async function initialSync() {
+  await syncLocations();
+  await syncCustomers();
+  await syncAllAvailability();
+}
+
+// Background refresher you can start once
+export function startBackgroundSync() {
+  // availability every 5 min
+  setInterval(syncAllAvailability, 5 * 60 * 1000);
+  // customers & locations hourly
+  setInterval(async () => {
+    await syncLocations();
+    await syncCustomers();
+  }, 60 * 60 * 1000);
+}
