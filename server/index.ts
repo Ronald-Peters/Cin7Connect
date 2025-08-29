@@ -5,7 +5,7 @@ import fetch from "node-fetch";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { registerRoutes } from "./routes";
-import { initialSync, startBackgroundSync } from "./sync.js";
+// Live sync functionality integrated in storage.ts
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1899,51 +1899,26 @@ app.listen(port, "0.0.0.0", async () => {
     const result = await storage.syncCin7Products();
     log(`📦 Database sync complete: ${result.synced} products synced, ${result.errors} errors`);
     
-    // Add sample products if none exist for demo purposes
+    // Sample products will be replaced by live Cin7 sync
     if (result.synced === 0) {
-      try {
-        await storage.upsertProduct({
-          sku: 'TU0014',
-          name: '12.4-36 6PR TT FARM KING',
-          description: 'Agriculture Tire - 12.4-36 6PR TT FARM KING',
-          price: 4200.00,
-          currency: 'ZAR',
-          category: 'Agriculture Tire',
-          barcode: '',
-          brand: 'FARM KING',
-          imageUrl: null,
-          images: [],
-        });
-        await storage.upsertProduct({
-          sku: 'TU0154',
-          name: '16.9-34 8PR TT FARM KING',
-          description: 'Agriculture Tire - 16.9-34 8PR TT FARM KING',
-          price: 5800.00,
-          currency: 'ZAR',
-          category: 'Agriculture Tire',
-          barcode: '',
-          brand: 'FARM KING',
-          imageUrl: null,
-          images: [],
-        });
-        log(`📦 Added sample products for catalog demonstration`);
-      } catch (error) {
-        log(`❌ Error adding sample products: ${error}`);
-      }
+      log(`📦 No products synced - live Cin7 sync will populate catalog`);
     }
   } catch (error) {
     log(`❌ Database sync failed: ${error}`);
   }
 
-  // Initial Cin7 → Supabase sync
-  try {
-    await initialSync();
-    log("✅ Initial Cin7 → Supabase sync complete");
-  } catch (error) {
-    log(`❌ Initial Cin7 → Supabase sync failed: ${error}`);
-  }
-
-  // Start background sync
-  startBackgroundSync();
-  log("🔄 Background Cin7 → Supabase sync started");
+  // Start live background sync for real-time data
+  log("🔄 Starting live background sync...");
+  
+  // Sync every 5 minutes for real-time inventory
+  setInterval(async () => {
+    try {
+      const result = await storage.syncCin7Products();
+      log(`🔄 Background sync: ${result.synced} products updated, ${result.errors} errors`);
+    } catch (error) {
+      log(`❌ Background sync failed: ${error}`);
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+  
+  log("✅ Live background sync activated - updates every 5 minutes");
 });
