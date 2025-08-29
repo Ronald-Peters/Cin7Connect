@@ -14,11 +14,15 @@ export default function HomePage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center text-white">
             <img 
-              src="/reivilo-logo.jpg" 
+              src="/assets/reivilo-logo.jpg" 
               alt="Reivilo Logo" 
               className="h-20 w-auto mx-auto mb-6"
               onError={(e) => {
-                e.currentTarget.style.display = 'none';
+                // Fallback to text logo
+                const fallback = document.createElement('div');
+                fallback.className = 'h-20 w-64 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white font-bold text-3xl';
+                fallback.textContent = 'REIVILO';
+                e.currentTarget.parentNode?.replaceChild(fallback, e.currentTarget);
               }}
             />
             <h1 className="text-5xl font-bold mb-4">45 Years of Excellence</h1>
