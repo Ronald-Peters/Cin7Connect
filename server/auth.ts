@@ -216,6 +216,84 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // Admin user management routes
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const adminUsers = await storage.getAllAdminUsers();
+      res.json(adminUsers.map(user => ({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+      })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch admin users" });
+    }
+  });
+
+  app.post("/api/admin/create-admin", async (req, res, next) => {
+    try {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const user = await storage.createUser({
+        email,
+        password: await hashPassword(password),
+        role: 'admin',
+        createdBy: req.user.id,
+      });
+
+      res.status(201).json({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        success: true,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    try {
+      if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const userId = req.params.id;
+      
+      // Prevent deleting yourself
+      if (userId === req.user.id) {
+        return res.status(400).json({ message: "Cannot delete your own admin account" });
+      }
+      
+      const success = await storage.deleteAdminUser(userId);
+      if (!success) {
+        return res.status(404).json({ message: "Admin user not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete admin user" });
+    }
+  });
+
   app.get("/api/user", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     

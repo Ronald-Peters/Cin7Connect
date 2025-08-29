@@ -16,6 +16,10 @@ export interface IStorage {
   updateCustomer(id: number, updates: Partial<Customer>): Promise<Customer | undefined>;
   syncCin7Customers(): Promise<void>;
   
+  // Admin user methods
+  getAllAdminUsers(): Promise<User[]>;
+  deleteAdminUser(id: string): Promise<boolean>;
+  
   // Customer methods
   getCustomerById(id: number): Promise<Customer | undefined>;
   getCustomerByErpId(erpId: string): Promise<Customer | undefined>;
@@ -157,13 +161,9 @@ export class DatabaseStorage implements IStorage {
           await this.upsertProduct({
             sku: sku,
             name: pricing?.name || sku,
-            price: pricing?.price || 0,
-            currency: 'ZAR',
-            category: pricing?.category || 'General',
             barcode: pricing?.barcode,
             brand: pricing?.brand,
             imageUrl: null,
-            images: [],
           });
           synced++;
         } catch (error) {
@@ -352,6 +352,16 @@ export class DatabaseStorage implements IStorage {
   async getQuotesByCustomerId(customerId: number): Promise<Quote[]> {
     // This would need to be implemented with proper user tracking in quotes
     return [];
+  }
+
+  // Admin user methods
+  async getAllAdminUsers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, 'admin')).orderBy(asc(users.email));
+  }
+
+  async deleteAdminUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    return Array.isArray(result) && result.length > 0;
   }
 }
 

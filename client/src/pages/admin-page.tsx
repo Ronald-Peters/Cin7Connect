@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, UserPlus, RefreshCw, Shield } from "lucide-react";
+import { Building2, Users, UserPlus, RefreshCw, Shield, UserCheck, Trash2 } from "lucide-react";
 
 interface Customer {
   id: number;
@@ -30,10 +30,16 @@ export default function AdminPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [newClientForm, setNewClientForm] = useState({
     email: "",
     password: "",
     customerId: "",
+  });
+  const [newAdminForm, setNewAdminForm] = useState({
+    email: "",
+    password: "",
   });
 
   // Redirect if not admin
@@ -196,8 +202,110 @@ export default function AdminPage() {
     }
   };
 
+  const fetchAdminUsers = async () => {
+    setAdminLoading(true);
+    try {
+      const response = await fetch("/api/admin/users");
+      if (response.ok) {
+        const data = await response.json();
+        setAdminUsers(data);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch admin users",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch admin users",
+        variant: "destructive",
+      });
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const createAdminUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newAdminForm.email || !newAdminForm.password) {
+      toast({
+        title: "Error",
+        description: "Email and password are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/create-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newAdminForm),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Admin user created successfully",
+        });
+        setNewAdminForm({ email: "", password: "" });
+        fetchAdminUsers();
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.message || "Failed to create admin user",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create admin user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteAdminUser = async (userId: string, email: string) => {
+    if (!confirm(`Are you sure you want to delete admin user: ${email}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Admin user deleted successfully",
+        });
+        fetchAdminUsers();
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.message || "Failed to delete admin user",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete admin user",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchCustomers();
+    fetchAdminUsers();
   }, []);
 
   return (
@@ -222,7 +330,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="customers" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="customers" data-testid="tab-customers">
               <Building2 className="w-4 h-4 mr-2" />
               Customer Management
@@ -230,6 +338,10 @@ export default function AdminPage() {
             <TabsTrigger value="users" data-testid="tab-users">
               <Users className="w-4 h-4 mr-2" />
               Create Client Users
+            </TabsTrigger>
+            <TabsTrigger value="admins" data-testid="tab-admins">
+              <Shield className="w-4 h-4 mr-2" />
+              Admin Users
             </TabsTrigger>
           </TabsList>
 
@@ -365,6 +477,125 @@ export default function AdminPage() {
                 </form>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="admins">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle data-testid="text-admin-users-title">
+                    <UserCheck className="w-5 h-5 mr-2 inline" />
+                    Admin User Management
+                  </CardTitle>
+                  <CardDescription data-testid="text-admin-users-description">
+                    Create and manage additional admin users who can access the admin portal
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={createAdminUser} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-email">Email Address</Label>
+                        <Input
+                          id="admin-email"
+                          type="email"
+                          value={newAdminForm.email}
+                          onChange={(e) => setNewAdminForm({ ...newAdminForm, email: e.target.value })}
+                          placeholder="admin@reiviloindustrial.co.za"
+                          data-testid="input-admin-email"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-password">Password</Label>
+                        <Input
+                          id="admin-password"
+                          type="password"
+                          value={newAdminForm.password}
+                          onChange={(e) => setNewAdminForm({ ...newAdminForm, password: e.target.value })}
+                          placeholder="Secure admin password"
+                          data-testid="input-admin-password"
+                        />
+                      </div>
+                    </div>
+                    
+                    <Button type="submit" className="w-full" data-testid="button-create-admin">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Create Admin User
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle data-testid="text-existing-admins-title">Existing Admin Users</CardTitle>
+                  <CardDescription data-testid="text-existing-admins-description">
+                    Manage current admin users with access to the portal
+                  </CardDescription>
+                  <Button
+                    variant="outline"
+                    onClick={fetchAdminUsers}
+                    disabled={adminLoading}
+                    data-testid="button-refresh-admins"
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${adminLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {adminLoading ? (
+                    <div className="text-center py-4" data-testid="text-admin-loading">
+                      Loading admin users...
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Email Address</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {adminUsers.map((admin) => (
+                          <TableRow key={admin.id} data-testid={`row-admin-${admin.id}`}>
+                            <TableCell className="font-medium" data-testid={`text-admin-email-${admin.id}`}>
+                              {admin.email}
+                              {admin.email === user?.email && (
+                                <Badge variant="secondary" className="ml-2">You</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell data-testid={`text-admin-role-${admin.id}`}>
+                              <Badge variant="default">
+                                <Shield className="w-3 h-3 mr-1" />
+                                Admin
+                              </Badge>
+                            </TableCell>
+                            <TableCell data-testid={`text-admin-created-${admin.id}`}>
+                              {admin.createdAt ? new Date(admin.createdAt).toLocaleDateString() : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {admin.email !== user?.email && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => deleteAdminUser(admin.id, admin.email)}
+                                  data-testid={`button-delete-admin-${admin.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
