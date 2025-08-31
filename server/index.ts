@@ -1871,7 +1871,12 @@ app.get("*", (req, res) => {
   }
 });
 
-const port = parseInt(process.env.PORT || '5000', 10);
+// ===== Single server listener (works locally and on Cloud Run) =====
+const HOST = '0.0.0.0';
+const PORT = parseInt(
+  process.env.PORT || (process.env.NODE_ENV === 'production' ? '8080' : '5000'),
+  10
+);
 
 // Handle uncaught exceptions and promise rejections for production stability
 process.on('uncaughtException', (error) => {
@@ -1886,31 +1891,23 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-app.listen(port, "0.0.0.0", async () => {
-  log(`🚀 Reivilo B2B Portal running on port ${port}`);
+app.listen(PORT, HOST, async () => {
+  log(`🚀 Reivilo B2B Portal running on port ${PORT}`);
   log(`📈 45 Years of Family Business Values Since 1980`);
-  log(`🌐 Visit: http://localhost:${port}`);
-  log(`🧪 Test App: http://localhost:${port}/app`);
+  log(`🌐 Visit: http://${HOST}:${PORT}`);
+  log(`🧪 Test App: http://${HOST}:${PORT}/app`);
   log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
   log(`🔑 Secrets loaded: ${process.env.CIN7_ACCOUNT_ID ? '✓' : '✗'} CIN7, ${process.env.DATABASE_URL ? '✓' : '✗'} DB`);
-  
-  // Sync Cin7 products to database on startup
+
   try {
     const result = await storage.syncCin7Products();
     log(`📦 Database sync complete: ${result.synced} products synced, ${result.errors} errors`);
-    
-    // Sample products will be replaced by live Cin7 sync
-    if (result.synced === 0) {
-      log(`📦 No products synced - live Cin7 sync will populate catalog`);
-    }
+    if (result.synced === 0) log(`📦 No products synced - live Cin7 sync will populate catalog`);
   } catch (error) {
     log(`❌ Database sync failed: ${error}`);
   }
 
-  // Start live background sync for real-time data
-  log("🔄 Starting live background sync...");
-  
-  // Sync every 5 minutes for real-time inventory
+  log('🔄 Starting live background sync...');
   setInterval(async () => {
     try {
       const result = await storage.syncCin7Products();
@@ -1918,15 +1915,7 @@ app.listen(port, "0.0.0.0", async () => {
     } catch (error) {
       log(`❌ Background sync failed: ${error}`);
     }
-  }, 5 * 60 * 1000); // 5 minutes
-  
-  log("✅ Live background sync activated - updates every 5 minutes");
-});
+  }, 5 * 60 * 1000);
 
-// Cloud Run requires this:
-const PORT = process.env.PORT || 8080;
-const HOST = "0.0.0.0";
-
-app.listen(PORT, HOST, () => {
-  console.log(`API listening on http://${HOST}:${PORT}`);
+  log('✅ Live background sync activated - updates every 5 minutes');
 });
