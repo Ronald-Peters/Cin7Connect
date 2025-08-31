@@ -1922,3 +1922,11 @@ app.listen(port, "0.0.0.0", async () => {
   
   log("✅ Live background sync activated - updates every 5 minutes");
 });
+
+// Cloud Run requires this:
+const PORT = process.env.PORT || 8080;
+const HOST = "0.0.0.0";
+
+app.listen(PORT, HOST, () => {
+  console.log(`API listening on http://${HOST}:${PORT}`);
+});
