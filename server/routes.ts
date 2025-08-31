@@ -13,29 +13,34 @@ interface CartItem {
 
 interface Cart {
   items: CartItem[];
-  location?: string;
+  location?: string | null;
 }
 
 // In-memory cart storage (replace with DB/Redis in production)
 const carts = new Map<string, Cart>();
 
 function requireAuth(req: any, res: any, next: any) {
-  if (!req.isAuthenticated()) {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
     return res.status(401).json({ message: "Authentication required" });
   }
   next();
 }
 
 export function registerRoutes(app: Express): Server {
+  // Auth/session middleware
   setupAuth(app);
 
-  // Health check
-  app.get("/api/health", (req, res) => {
+  // -------------------------
+  // Health
+  // -------------------------
+  app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
   });
 
-  // Manual product sync for testing
-  app.post("/api/products/sync", async (req, res) => {
+  // -------------------------
+  // Manual product sync (optional – keeps your old DB sync utility)
+  // -------------------------
+  app.post("/api/products/sync", async (_req, res) => {
     try {
       const result = await storage.syncCin7Products();
       res.json(result);
@@ -45,41 +50,42 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Warehouses
-  app.get("/api/warehouses", async (req, res) => {
+  // -------------------------
+  // Warehouses (direct from Cin7)
+  // -------------------------
+  app.get("/api/warehouses", async (_req, res) => {
     try {
-      const warehouses = await storage.getWarehouses();
-      res.json(warehouses.map(w => ({ id: w.id, name: w.cin7LocationName })));
+      const warehouses = await cin7Service.getWarehouses();
+      const out = (warehouses || []).map((w: any) => ({
+        id: w.ID,
+        name: w.Name,
+        isDefault: !!w.IsDefault,
+      }));
+      res.json(out);
     } catch (error) {
       console.error("Error fetching warehouses:", error);
       res.status(500).json({ message: "Failed to fetch warehouses" });
     }
   });
 
-  // Products
+  // -------------------------
+  // Products (direct from Cin7)
+  // -------------------------
   app.get("/api/products", async (req, res) => {
     try {
-      const { q = '', page = '1', pageSize = '50' } = req.query;
-      const pageNum = parseInt(page as string);
-      const pageSizeNum = parseInt(pageSize as string);
+      const q = ((req.query.q as string) || "").trim();
+      // accept either ?limit= or ?pageSize=; default 50
+      const limit =
+        parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10) || 50;
 
-      const { products, total } = await storage.getProducts(
-        q as string, 
-        pageNum, 
-        pageSizeNum
-      );
-
-      // Get availability for these products
-      const productIds = products.map(p => p.id);
-      const availability = await storage.getAvailabilityByProductIds(productIds);
+      const products = await cin7Service.getProducts({
+        search: q,
+        limit,
+      });
 
       res.json({
-        items: products,
-        availability,
-        total,
-        page: pageNum,
-        pageSize: pageSizeNum,
-        totalPages: Math.ceil(total / pageSizeNum)
+        items: products || [],
+        total: (products || []).length,
       });
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -87,27 +93,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Customer profile
-  app.get("/api/customers/me", requireAuth, async (req, res) => {
+  // -------------------------
+  // Customer profile (requires auth, reads from your DB)
+  // -------------------------
+  app.get("/api/customers/me", requireAuth, async (req: any, res) => {
     try {
       const user = req.user!;
-      
-      if (!user.customerId) {
+      if (!user?.customerId) {
         return res.status(404).json({ message: "No customer profile found" });
-      }
+    }
 
       const customer = await storage.getCustomerById(user.customerId);
-      
       if (!customer) {
         return res.status(404).json({ message: "Customer not found" });
       }
 
-      // Parse contacts JSON
-      let contacts = [];
+      // Parse contacts JSON safely
+      let contacts: any[] = [];
       if (customer.contacts) {
         try {
           contacts = JSON.parse(customer.contacts as string);
-        } catch (e) {
+        } catch {
           contacts = [];
         }
       }
@@ -122,8 +128,10 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Cart operations
-  app.get("/api/cart", requireAuth, (req, res) => {
+  // -------------------------
+  // Cart (requires auth) – in-memory for now
+  // -------------------------
+  app.get("/api/cart", requireAuth, (req: any, res) => {
     try {
       const userId = req.user!.id;
       const cart = carts.get(userId) || { items: [], location: null };
@@ -134,14 +142,14 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  app.post("/api/cart", requireAuth, (req, res) => {
+  app.post("/api/cart", requireAuth, (req: any, res) => {
     try {
       const userId = req.user!.id;
       const { items, location } = req.body;
 
       const cart: Cart = {
-        items: items || [],
-        location: location || null
+        items: Array.isArray(items) ? items : [],
+        location: location ?? null,
       };
 
       carts.set(userId, cart);
@@ -152,8 +160,10 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Checkout
-  app.post("/api/cart/checkout", requireAuth, async (req, res) => {
+  // -------------------------
+  // Checkout (requires auth) – creates an UNAUTHORISED quote in Cin7
+  // -------------------------
+  app.post("/api/cart/checkout", requireAuth, async (req: any, res) => {
     try {
       const user = req.user!;
       const cart = carts.get(user.id);
@@ -161,88 +171,84 @@ export function registerRoutes(app: Express): Server {
       if (!cart || !cart.items || cart.items.length === 0) {
         return res.status(400).json({ message: "Cart is empty" });
       }
-
       if (!cart.location) {
         return res.status(400).json({ message: "Location is required for checkout" });
       }
 
-      // Get customer details
+      // Load customer (from your DB)
       let customer = null;
       if (user.customerId) {
         customer = await storage.getCustomerById(user.customerId);
       }
-
       if (!customer) {
         return res.status(404).json({ message: "Customer profile required for checkout" });
       }
 
-      // Build quote payload for Cin7
+      // Build payload for Cin7
       const quotePayload = {
         Customer: customer.erpCustomerId || customer.companyName || "",
         CustomerID: customer.erpCustomerId || "",
-        PriceTier: customer.priceTier || 'Wholesale',
+        PriceTier: customer.priceTier || "Wholesale",
         Location: cart.location,
-        OrderStatus: 'NOTAUTHORISED',
-        Lines: cart.items.map(item => ({
+        OrderStatus: "NOTAUTHORISED",
+        Lines: cart.items.map((item) => ({
           SKU: item.sku,
           Quantity: item.quantity,
           Price: item.price || 0,
-          TaxRule: 'Default'
-        }))
+          TaxRule: "Default",
+        })),
       };
 
       try {
-        // Create quote in Cin7
+        // Create in Cin7
         const cin7Response = await cin7Service.createQuote(quotePayload);
 
-        // Save quote to local database
+        // Save locally
         const quote = await storage.createQuote({
           erpSaleId: cin7Response.ID || cin7Response.SaleID,
-          status: 'NOTAUTHORISED',
+          status: "NOTAUTHORISED",
           payload: JSON.stringify({
             cin7_response: cin7Response,
             original_cart: cart,
             user_id: user.id,
-            customer_id: customer.id
-          })
+            customer_id: customer.id,
+          }),
         });
 
-        // Clear cart after successful checkout
+        // Clear cart on success
         carts.delete(user.id);
 
         res.json({
           success: true,
           quote_id: quote.id,
           erp_sale_id: cin7Response.ID || cin7Response.SaleID,
-          cin7_response: cin7Response
+          cin7_response: cin7Response,
         });
-
       } catch (cin7Error: any) {
         console.error("Cin7 API error:", cin7Error);
-        
-        // Still save the quote locally even if Cin7 fails
+
         const quote = await storage.createQuote({
-          status: 'FAILED',
+          status: "FAILED",
           payload: JSON.stringify({
             error: cin7Error.message,
             original_cart: cart,
             user_id: user.id,
-            customer_id: customer.id
-          })
+            customer_id: customer.id,
+          }),
         });
 
-        res.status(500).json({ 
+        res.status(500).json({
           message: `Quote creation failed: ${cin7Error.message}`,
-          quote_id: quote.id
+          quote_id: quote.id,
         });
       }
-
     } catch (error) {
       console.error("Checkout error:", error);
       res.status(500).json({ message: "Checkout failed" });
     }
   });
 
+  // Return Node HTTP server
   const httpServer = createServer(app);
   return httpServer;
 }
