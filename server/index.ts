@@ -1871,51 +1871,10 @@ app.get("*", (req, res) => {
   }
 });
 
-// ===== Single server listener (works locally and on Cloud Run) =====
-const HOST = '0.0.0.0';
-const PORT = parseInt(
-  process.env.PORT || (process.env.NODE_ENV === 'production' ? '8080' : '5000'),
-  10
-);
+// Cloud Run requires this:
+const PORT = process.env.PORT || 8080;
+const HOST = "0.0.0.0";
 
-// Handle uncaught exceptions and promise rejections for production stability
-process.on('uncaughtException', (error) => {
-  log(`❌ Uncaught Exception: ${error.message}`);
-  console.error(error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  log(`❌ Unhandled Rejection at: ${promise}, reason: ${reason}`);
-  console.error(reason);
-  process.exit(1);
-});
-
-app.listen(PORT, HOST, async () => {
-  log(`🚀 Reivilo B2B Portal running on port ${PORT}`);
-  log(`📈 45 Years of Family Business Values Since 1980`);
-  log(`🌐 Visit: http://${HOST}:${PORT}`);
-  log(`🧪 Test App: http://${HOST}:${PORT}/app`);
-  log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-  log(`🔑 Secrets loaded: ${process.env.CIN7_ACCOUNT_ID ? '✓' : '✗'} CIN7, ${process.env.DATABASE_URL ? '✓' : '✗'} DB`);
-
-  try {
-    const result = await storage.syncCin7Products();
-    log(`📦 Database sync complete: ${result.synced} products synced, ${result.errors} errors`);
-    if (result.synced === 0) log(`📦 No products synced - live Cin7 sync will populate catalog`);
-  } catch (error) {
-    log(`❌ Database sync failed: ${error}`);
-  }
-
-  log('🔄 Starting live background sync...');
-  setInterval(async () => {
-    try {
-      const result = await storage.syncCin7Products();
-      log(`🔄 Background sync: ${result.synced} products updated, ${result.errors} errors`);
-    } catch (error) {
-      log(`❌ Background sync failed: ${error}`);
-    }
-  }, 5 * 60 * 1000);
-
-  log('✅ Live background sync activated - updates every 5 minutes');
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 API listening on http://${HOST}:${PORT}`);
 });
