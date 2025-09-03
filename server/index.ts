@@ -1,21 +1,84 @@
-// server/index.ts
-import express, { type Request, type Response, type NextFunction } from "express";
+import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import fetch from "node-fetch";
+import session from "express-session";
 
-// ---------- basics ----------
+// If you still use passport in ./auth you can leave it imported,
+// but this file now provides working /api/login + session itself.
+// import { setupAuth } from "./auth"; // optional
+import { storage } from "./storage";
+
+// ---------- Paths / helpers ----------
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-
 function log(message: string) {
   console.log(`[${new Date().toISOString()}] ${message}`);
 }
 
-// ---------- Cin7 Core helpers ----------
+// ---------- App ----------
+const app = express();
+app.set("trust proxy", 1);
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// Simple session (cookie-based)
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "reivilo-b2b-dev-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false, // set true when behind HTTPS proxy that sets `trust proxy`
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    },
+  })
+);
+
+// ---------- Auth (minimal, works today) ----------
+type User = { id: string; email: string; role: "admin" | "user"; name?: string };
+
+function authenticate(email?: string, password?: string): User | null {
+  if (!email || !password) return null;
+
+  // Env overrides; falls back to your provided admin user
+  const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "ronald@reiviloindustrial.co.za").toLowerCase();
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Ron@Reiv25";
+
+  if (email.toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    return { id: "admin-1", email: ADMIN_EMAIL, role: "admin", name: "Admin" };
+  }
+  return null;
+}
+
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const user = (req.session as any)?.user as User | undefined;
+  if (user) return next();
+  return res.status(401).json({ message: "Authentication required" });
+}
+
+app.post("/api/login", (req, res) => {
+  const { email, password } = req.body || {};
+  const user = authenticate(email, password);
+  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+  (req.session as any).user = user;
+  res.json({ ok: true, user });
+});
+
+app.post("/api/logout", (req, res) => {
+  req.session?.destroy(() => {});
+  res.json({ ok: true });
+});
+
+app.get("/api/auth/me", (req, res) => {
+  const user = (req.session as any)?.user as User | undefined;
+  if (!user) return res.status(401).json({ message: "Not authenticated" });
+  res.json({ ok: true, user });
+});
+
+// ---------- Core (Cin7) ----------
 const CORE_BASE_URL =
   process.env.CORE_BASE_URL || "https://inventory.dearsystems.com/ExternalApi";
 
@@ -26,19 +89,18 @@ const CORE_HEADERS = () => ({
 });
 
 async function coreGet(
-  path: string,
+  apiPath: string,
   {
     page,
     limit,
     qs = {},
-  }: { page?: number; limit?: number; qs?: Record<string, string | number | boolean> } = {}
+  }: { page?: number; limit?: number; qs?: Record<string, any> } = {}
 ) {
-  const url = new URL(`${CORE_BASE_URL}${path}`);
+  const url = new URL(`${CORE_BASE_URL}${apiPath}`);
   if (page) url.searchParams.set("page", String(page));
   if (limit) url.searchParams.set("limit", String(limit));
-  for (const [k, v] of Object.entries(qs)) {
+  for (const [k, v] of Object.entries(qs))
     if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
-  }
 
   const res = await fetch(url.toString(), { headers: CORE_HEADERS() });
   if (!res.ok) {
@@ -48,8 +110,8 @@ async function coreGet(
   return res.json();
 }
 
-async function corePost(path: string, body: any) {
-  const url = `${CORE_BASE_URL}${path}`;
+async function corePost(apiPath: string, body: any) {
+  const url = `${CORE_BASE_URL}${apiPath}`;
   const res = await fetch(url, {
     method: "POST",
     headers: CORE_HEADERS(),
@@ -62,178 +124,37 @@ async function corePost(path: string, body: any) {
   return res.json();
 }
 
-// ---------- Shared constants/utilities ----------
-const ALLOWED_INTERNAL_LOCATIONS = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"] as const;
-type AllowedLoc = (typeof ALLOWED_INTERNAL_LOCATIONS)[number];
+// ---------- Health / connectivity ----------
+app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-const REGION_FROM_LOCATION: Record<AllowedLoc, "JHB" | "CPT" | "BFN"> = {
-  "B-VDB": "JHB",
-  "S-POM": "JHB",
-  "B-CPT": "CPT",
-  "S-CPT": "CPT",
-  "S-BFN": "BFN",
-};
-
-const displayCount = (n: number) => (n > 20 ? "20+" : String(n));
-
-// Fetch **all** pages from /ProductAvailability but only for allowed locations
-async function getAllAvailability(): Promise<
-  Array<{
-    SKU: string;
-    Name?: string;
-    Location: AllowedLoc | string;
-    Available?: number;
-    OnHand?: number;
-    OnOrder?: number;
-  }>
-> {
-  const all: any[] = [];
-  let page = 1;
-  const PAGE_SIZE = 1000;
-
-  while (true) {
-    const data = (await coreGet("/ProductAvailability", {
-      page,
-      limit: PAGE_SIZE,
-    })) as any;
-
-    const rows: any[] = data?.ProductAvailability || [];
-    if (!rows.length) break;
-
-    all.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-    page++;
-  }
-
-  return all.filter((r) => ALLOWED_INTERNAL_LOCATIONS.includes(r.Location));
-}
-
-// Build the products array with region breakdown + masked display values
-async function aggregateProducts() {
-  const availability = await getAllAvailability();
-
-  const map = new Map<
-    string,
-    {
-      sku: string;
-      name: string;
-      available: number;
-      onHand: number;
-      onOrder: number;
-      warehouseBreakdown: {
-        jhb: { available: number; onHand: number; onOrder: number };
-        cpt: { available: number; onHand: number; onOrder: number };
-        bfn: { available: number; onHand: number; onOrder: number };
-      };
-    }
-  >();
-
-  for (const row of availability) {
-    const sku = row.SKU;
-    if (!sku) continue;
-
-    if (!map.has(sku)) {
-      map.set(sku, {
-        sku,
-        name: row.Name || sku,
-        available: 0,
-        onHand: 0,
-        onOrder: 0,
-        warehouseBreakdown: {
-          jhb: { available: 0, onHand: 0, onOrder: 0 },
-          cpt: { available: 0, onHand: 0, onOrder: 0 },
-          bfn: { available: 0, onHand: 0, onOrder: 0 },
-        },
-      });
-    }
-
-    const p = map.get(sku)!;
-    const loc = row.Location as AllowedLoc;
-    const region = REGION_FROM_LOCATION[loc];
-
-    const inc = {
-      available: Number(row.Available || 0),
-      onHand: Number(row.OnHand || 0),
-      onOrder: Number(row.OnOrder || 0),
-    };
-
-    p.available += inc.available;
-    p.onHand += inc.onHand;
-    p.onOrder += inc.onOrder;
-
-    if (region === "JHB") {
-      p.warehouseBreakdown.jhb.available += inc.available;
-      p.warehouseBreakdown.jhb.onHand += inc.onHand;
-      p.warehouseBreakdown.jhb.onOrder += inc.onOrder;
-    } else if (region === "CPT") {
-      p.warehouseBreakdown.cpt.available += inc.available;
-      p.warehouseBreakdown.cpt.onHand += inc.onHand;
-      p.warehouseBreakdown.cpt.onOrder += inc.onOrder;
-    } else if (region === "BFN") {
-      p.warehouseBreakdown.bfn.available += inc.available;
-      p.warehouseBreakdown.bfn.onHand += inc.onHand;
-      p.warehouseBreakdown.bfn.onOrder += inc.onOrder;
-    }
-  }
-
-  const products = Array.from(map.values()).map((p, idx) => ({
-    id: idx + 1,
-    sku: p.sku,
-    name: p.name,
-    description: "Agriculture Tire",
-    price: 0,
-    currency: "ZAR",
-    available: p.available,
-    onHand: p.onHand,
-    onOrder: p.onOrder,
-    warehouseBreakdown: p.warehouseBreakdown,
-    warehouseBreakdownDisplay: {
-      jhb: {
-        available: displayCount(p.warehouseBreakdown.jhb.available),
-        onHand: displayCount(p.warehouseBreakdown.jhb.onHand),
-        onOrder: displayCount(p.warehouseBreakdown.jhb.onOrder),
-      },
-      cpt: {
-        available: displayCount(p.warehouseBreakdown.cpt.available),
-        onHand: displayCount(p.warehouseBreakdown.cpt.onHand),
-        onOrder: displayCount(p.warehouseBreakdown.cpt.onOrder),
-      },
-      bfn: {
-        available: displayCount(p.warehouseBreakdown.bfn.available),
-        onHand: displayCount(p.warehouseBreakdown.bfn.onHand),
-        onOrder: displayCount(p.warehouseBreakdown.bfn.onOrder),
-      },
-    },
-    imageUrl: `https://via.placeholder.com/400x300/1E3A8A/FFFFFF?text=${encodeURIComponent(
-      p.sku
-    )}`,
-    images: [],
-  }));
-
-  return products;
-}
-
-// ---------- API ROUTES ----------
-
-// Health
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
-});
-
-// Test connectivity
 app.get("/api/test-connection", async (_req, res) => {
   try {
     const result = await coreGet("/Locations", { page: 1, limit: 1 });
     res.json({ success: true, connected: true, result });
-  } catch (e: any) {
-    res.status(500).json({ success: false, error: String(e.message || e) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Warehouses (grouped)
+// ---------- Inventory helpers ----------
+const ALLOWED_LOCATIONS = ["B-CPT", "B-VDB", "S-BFN", "S-CPT", "S-POM"] as const;
+
+function toRegion(name: string) {
+  if (["B-VDB", "S-POM"].includes(name)) return "JHB";
+  if (["B-CPT", "S-CPT"].includes(name)) return "CPT";
+  if (name === "S-BFN") return "BFN";
+  return "OTHER";
+}
+
+function capQty(qty: number) {
+  if (qty >= 20) return "20+";
+  return String(qty);
+}
+
+// ---------- Warehouses (grouped for front-end) ----------
 app.get("/api/warehouses", async (_req, res) => {
   try {
-    await coreGet("/Locations", { page: 1, limit: 500 }); // sanity check
+    // We only need to return the grouped/visible warehouses for the UI
     const grouped = [
       { id: 1, name: "JHB Warehouse", internalLocations: ["B-VDB", "S-POM"] },
       { id: 2, name: "CPT Warehouse", internalLocations: ["B-CPT", "S-CPT"] },
@@ -241,116 +162,246 @@ app.get("/api/warehouses", async (_req, res) => {
     ];
     res.json(grouped);
   } catch (e: any) {
-    res.status(500).json({ message: "Failed to fetch warehouses", error: String(e.message || e) });
+    res.status(500).json({ message: "Failed to fetch warehouses" });
   }
 });
 
-// Products (aggregated + masked display)
+// ---------- Products (availability grouped JHB/CPT/BFN + “20+” cap) ----------
 app.get("/api/products", async (req, res) => {
   try {
-    const q = ((req.query.q as string) || "").trim().toLowerCase();
-    const products = await aggregateProducts();
-    const filtered =
-      q.length > 0
-        ? products.filter(
-            (p) =>
-              p.sku.toLowerCase().includes(q) ||
-              (p.name || "").toLowerCase().includes(q) ||
-              (p.description || "").toLowerCase().includes(q)
-          )
-        : products;
+    const limit = Number(req.query.limit || 1000);
 
-    res.json({
-      products: filtered,
-      total: filtered.length,
-      filteredWarehouses: ["JHB", "CPT", "BFN"],
-    });
+    // 1) Pull ALL availability (paginate 1000/page)
+    let all: any[] = [];
+    let page = 1;
+    for (;;) {
+      const pageData = (await coreGet("/ProductAvailability", {
+        page,
+        limit: 1000,
+      })) as any;
+      const rows = pageData.ProductAvailability || [];
+      all = all.concat(rows);
+      if (rows.length < 1000) break;
+      page += 1;
+    }
+
+    // 2) Filter allowed warehouses
+    const filtered = all.filter((r) => ALLOWED_LOCATIONS.includes(r.Location));
+
+    // 3) Group per SKU with 3-region breakdown
+    const map = new Map<
+      string,
+      {
+        sku: string;
+        name: string;
+        available: number;
+        onHand: number;
+        onOrder: number;
+        warehouseBreakdown: {
+          jhb: { available: number; onHand: number; onOrder: number };
+          cpt: { available: number; onHand: number; onOrder: number };
+          bfn: { available: number; onHand: number; onOrder: number };
+        };
+      }
+    >();
+
+    for (const row of filtered) {
+      const sku = row.SKU as string;
+      if (!map.has(sku)) {
+        map.set(sku, {
+          sku,
+          name: row.Name || row.ProductName || sku,
+          available: 0,
+          onHand: 0,
+          onOrder: 0,
+          warehouseBreakdown: {
+            jhb: { available: 0, onHand: 0, onOrder: 0 },
+            cpt: { available: 0, onHand: 0, onOrder: 0 },
+            bfn: { available: 0, onHand: 0, onOrder: 0 },
+          },
+        });
+      }
+      const item = map.get(sku)!;
+      item.available += row.Available || 0;
+      item.onHand += row.OnHand || 0;
+      item.onOrder += row.OnOrder || 0;
+
+      const region = toRegion(row.Location);
+      if (region === "JHB") {
+        item.warehouseBreakdown.jhb.available += row.Available || 0;
+        item.warehouseBreakdown.jhb.onHand += row.OnHand || 0;
+        item.warehouseBreakdown.jhb.onOrder += row.OnOrder || 0;
+      } else if (region === "CPT") {
+        item.warehouseBreakdown.cpt.available += row.Available || 0;
+        item.warehouseBreakdown.cpt.onHand += row.OnHand || 0;
+        item.warehouseBreakdown.cpt.onOrder += row.OnOrder || 0;
+      } else if (region === "BFN") {
+        item.warehouseBreakdown.bfn.available += row.Available || 0;
+        item.warehouseBreakdown.bfn.onHand += row.OnHand || 0;
+        item.warehouseBreakdown.bfn.onOrder += row.OnOrder || 0;
+      }
+    }
+
+    // 4) Build response (cap to “20+” per warehouse)
+    const products = Array.from(map.values()).slice(0, limit).map((p, idx) => ({
+      id: idx + 1,
+      sku: p.sku,
+      name: p.name,
+      description: "Agriculture Tire",
+      price: 0,
+      currency: "ZAR",
+      available: p.available,
+      onHand: p.onHand,
+      onOrder: p.onOrder,
+      warehouseBreakdown: {
+        jhb: { available: capQty(p.warehouseBreakdown.jhb.available), onHand: p.warehouseBreakdown.jhb.onHand, onOrder: p.warehouseBreakdown.jhb.onOrder },
+        cpt: { available: capQty(p.warehouseBreakdown.cpt.available), onHand: p.warehouseBreakdown.cpt.onHand, onOrder: p.warehouseBreakdown.cpt.onOrder },
+        bfn: { available: capQty(p.warehouseBreakdown.bfn.available), onHand: p.warehouseBreakdown.bfn.onHand, onOrder: p.warehouseBreakdown.bfn.onOrder },
+      },
+    }));
+
+    res.json({ products, total: products.length, filteredWarehouses: ["JHB", "CPT", "BFN"] });
   } catch (e: any) {
-    log(`Error in /api/products: ${e.message}`);
-    res.status(500).json({ message: "Failed to fetch products", error: String(e.message || e) });
+    log(`Error fetching products: ${e.message}`);
+    res.status(500).json({ message: "Failed to fetch products" });
   }
 });
 
-// Availability (paged)
+// ---------- Raw availability (debug-heavy) ----------
 app.get("/api/availability", async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10));
-    const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit || "500"), 10)));
-    const { sku, name, location } = req.query;
+    const sku = req.query.sku as string | undefined;
+    let all: any[] = [];
+    let page = 1;
+    for (;;) {
+      const pageData = (await coreGet("/ProductAvailability", {
+        page,
+        limit: sku ? 50 : 1000,
+      })) as any;
+      const rows = pageData.ProductAvailability || [];
+      all = all.concat(rows);
+      if (rows.length < 1000 || sku) break;
+      page += 1;
+    }
 
-    const data = await coreGet("/ProductAvailability", {
-      page,
-      limit,
-      qs: {
-        ...(sku ? { sku: String(sku) } : {}),
-        ...(name ? { name: String(name) } : {}),
-        ...(location ? { location: String(location) } : {}),
-      },
-    });
+    const filtered = all
+      .filter((r) => ALLOWED_LOCATIONS.includes(r.Location))
+      .filter((r) => (sku ? r.SKU === sku : true))
+      .map((r) => ({
+        productSku: r.SKU,
+        productName: r.Name,
+        warehouseName:
+          toRegion(r.Location) === "JHB"
+            ? "JHB Warehouse"
+            : toRegion(r.Location) === "CPT"
+            ? "CPT Warehouse"
+            : toRegion(r.Location) === "BFN"
+            ? "BFN Warehouse"
+            : r.Location,
+        internalLocation: r.Location,
+        available: r.Available || 0,
+        onHand: r.OnHand || 0,
+        onOrder: r.OnOrder || 0,
+      }));
 
-    res.json({ page, limit, data });
+    res.json(filtered);
   } catch (e: any) {
-    res.status(500).json({ message: "Failed to fetch availability", error: String(e.message || e) });
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// ---------- Quote (checkout -> NOTAUTHORISED) ----------
+app.post("/api/checkout", requireAuth, async (req, res) => {
+  try {
+    const { orderReference, customerDetails } = req.body || {};
+    if (!orderReference || String(orderReference).trim() === "") {
+      return res.status(400).json({ error: "Order reference is mandatory" });
+    }
+
+    // Minimal cart example (you can wire this to your real cart)
+    const cartItems: Array<{ sku: string; quantity: number; price: number; warehouse?: string }> =
+      req.body.items || [];
+
+    if (!cartItems.length) {
+      return res.status(400).json({ error: "Cart is empty" });
+    }
+
+    const payload = {
+      CustomerName: customerDetails?.companyName || "B2B Portal Customer",
+      Status: "UNAUTHORISED",
+      OrderNumber: orderReference,
+      OrderDate: new Date().toISOString().split("T")[0],
+      Lines: cartItems.map((it: any, idx: number) => ({
+        SKU: it.sku,
+        Quantity: Number(it.quantity || 1),
+        Price: Number(it.price || 0),
+        LineOrder: idx + 1,
+        Location: it.warehouse?.includes("JHB")
+          ? "B-VDB"
+          : it.warehouse?.includes("CPT")
+          ? "B-CPT"
+          : "S-BFN",
+      })),
+    };
+
+    const result = await corePost("/Sale", payload);
+    res.json({
+      success: true,
+      message: "Created NOTAUTHORISED quote in Cin7",
+      cin7QuoteId: (result as any)?.ID,
+      orderReference,
+    });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: String(e.message || e) });
   }
 });
 
 // ---------- Static assets ----------
-app.use(
-  "/attached_assets",
-  express.static(path.resolve(__dirname, "../attached_assets"))
-);
+app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
 const publicPath =
   process.env.NODE_ENV === "production"
     ? path.resolve(__dirname, "./public")
     : path.resolve(__dirname, "../dist/public");
-
-const reactIndexPath =
-  process.env.NODE_ENV === "production"
-    ? path.resolve(__dirname, "./public/index.html")
-    : path.resolve(__dirname, "../dist/public/index.html");
-
 app.use("/assets", express.static(path.join(publicPath, "assets")));
 log(`📁 Serving assets from: ${path.join(publicPath, "assets")}`);
 
-// ---------- App routes (serve React) ----------
-const serveApp = (_req: Request, res: Response) => {
-  res.sendFile(reactIndexPath, (err) => {
+// ---------- Catalog (protected) ----------
+app.get("/catalog", requireAuth, async (_req, res) => {
+  // Serve your existing server-rendered catalog page or a simple redirect into the SPA.
+  // If you keep your previous HTML generator, you can paste it here.
+  res.redirect("/"); // Let SPA handle `/catalog` if you prefer
+});
+
+// ---------- SPA / landing (HOME) ----------
+function sendSpa(req: Request, res: Response) {
+  const indexHtml =
+    process.env.NODE_ENV === "production"
+      ? path.resolve(__dirname, "./public/index.html")
+      : path.resolve(__dirname, "../dist/public/index.html");
+  res.sendFile(indexHtml, (err) => {
     if (err) {
-      log(`❌ Error serving app: ${err.message}`);
-      res.status(500).send("App unavailable");
+      log(`❌ Error serving SPA: ${err.message}`);
+      res.status(500).send("App failed to load");
     }
   });
-};
+}
 
-// Land on the **home page** again
-app.get("/", serveApp);
-
-// Common client routes (login, app, admin, etc.)
-app.get(["/login", "/app", "/admin", "/cart", "/profile", "/catalog"], serveApp);
-
-// Catch-all for client-side routing: send React index for non-API, non-asset routes
-app.get("*", (req, res, next) => {
-  if (
-    req.path.startsWith("/api/") ||
-    req.path.startsWith("/assets/") ||
-    req.path.startsWith("/attached_assets/")
-  ) {
-    return next(); // let API/static handlers deal with it (or 404 if none)
-  }
-  return serveApp(req, res);
-});
+// Home should be the landing page
+app.get("/", sendSpa);
+// And let these routes also load the SPA so the React router can handle them
+app.get(["/login", "/admin", "/app", "/catalog/*", "/profile", "/cart"], sendSpa);
 
 // ---------- Error handler ----------
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
-  log(`❌ Error middleware: ${message}`);
+  log(`Error middleware: ${message}`);
   res.status(status).json({ message });
 });
 
 // ---------- Start ----------
-const PORT = process.env.PORT || 8080;
+const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
 app.listen(PORT, HOST, () => {
   console.log(`🚀 API listening on http://${HOST}:${PORT}`);
