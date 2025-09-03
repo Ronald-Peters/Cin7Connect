@@ -57,7 +57,8 @@ export function registerRoutes(app: Express): Server {
     try {
       const warehouses = await cin7Service.getWarehouses();
       const out = (warehouses || []).map((w: any) => ({
-        id: w.ID,
+        // ✅ Cin7 returns "Id" (capital I, lowercase d), not "ID"
+        id: w.Id,
         name: w.Name,
         isDefault: !!w.IsDefault,
       }));
@@ -101,7 +102,7 @@ export function registerRoutes(app: Express): Server {
       const user = req.user!;
       if (!user?.customerId) {
         return res.status(404).json({ message: "No customer profile found" });
-    }
+      }
 
       const customer = await storage.getCustomerById(user.customerId);
       if (!customer) {
