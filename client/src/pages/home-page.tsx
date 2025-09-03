@@ -23,7 +23,7 @@ export default function HomePage() {
                   className="h-24 w-auto mb-6"
                 />
                 <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-                  Reivilo Industrial
+                  Reivilo Industrial Ltd
                 </h1>
                 <h2 className="text-xl lg:text-2xl text-[#1e3a8a] font-semibold mb-4">
                   45 Years of Industrial Excellence
