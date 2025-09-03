@@ -1,11 +1,6 @@
-// services/cin7.ts
 import axios, { AxiosInstance, AxiosError } from "axios";
 
-/**
- * Cin7 Core (Dear Systems) REST client
- * Docs: https://inventory.dearsystems.com/ExternalApi
- */
-
+/** Dear Systems (Cin7 Core) client */
 interface Cin7Config {
   baseURL: string;
   accountId: string;
@@ -99,25 +94,20 @@ export class Cin7Service {
       timeout: 30000,
     });
 
-    // Simple retry with exponential backoff (1s, 2s, 4s) for transient errors.
+    // Retry transient failures (1s, 2s, 4s)
     this.client.interceptors.response.use(
-      (response) => response,
+      (resp) => resp,
       async (error: AxiosError) => {
         const cfg = error.config as any;
         if (!cfg) throw this.formatError(error);
-
         cfg.__retryCount = cfg.__retryCount || 0;
         if (cfg.__retryCount >= 3) throw this.formatError(error);
-
         cfg.__retryCount++;
-        const delayMs = Math.pow(2, cfg.__retryCount) * 1000;
-        await new Promise((r) => setTimeout(r, delayMs));
+        await new Promise((r) => setTimeout(r, Math.pow(2, cfg.__retryCount) * 1000));
         return this.client(cfg);
       }
     );
   }
-
-  // ---------- Helpers ----------
 
   private formatError(error: AxiosError): Error {
     if (error.response) {
@@ -137,40 +127,33 @@ export class Cin7Service {
     }
   }
 
-  // Use a simple call that should always succeed if creds are correct.
+  /** Smoke test: should succeed if creds/baseURL are correct */
   async testConnection(): Promise<boolean> {
-    try {
-      // Dear/Core: warehouses live under /Ref/Warehouse
-      await this.client.get("/Ref/Warehouse", { params: { Page: 1, Limit: 1 } });
-      return true;
-    } catch (error) {
-      throw this.formatError(error as AxiosError);
-    }
+    await this.client.get("/Ref/Warehouse", { params: { Page: 1, Limit: 1 } });
+    return true;
   }
 
-  // ---------- Warehouses ----------
+  // ---------- Warehouses (Dear/Core) ----------
 
-  // UPDATED: Dear/Core endpoint for locations/warehouses
+  /** Primary method */
   async getLocations(): Promise<Cin7Location[]> {
-    try {
-      const response = await this.client.get("/Ref/Warehouse", {
-        params: { Page: 1, Limit: 500 },
-      });
-      // Dear usually returns an array payload (not wrapped)
-      return (response.data as any[]) || [];
-    } catch (error) {
-      throw this.formatError(error as AxiosError);
-    }
+    const resp = await this.client.get("/Ref/Warehouse", {
+      params: { Page: 1, Limit: 500 },
+    });
+    return (resp.data as any[]) || [];
   }
 
-  // ---------- Products ----------
+  /** Back-compat alias for routes.ts */
+  async getWarehouses(): Promise<Cin7Location[]> {
+    return this.getLocations();
+  }
+
+  // ---------- Products (Dear/Core) ----------
 
   /**
-   * UPDATED: Dear/Core products endpoint.
-   * - Endpoint: /Ref/Product
-   * - Params: Search?, Page, Limit
-   * Returns a plain array so your routes.ts can do:
-   *   items: products, total: products.length
+   * Products list
+   * Params: Search (optional), Page, Limit
+   * Returns a plain array for your routes.
    */
   async getProducts(options?: {
     search?: string;
@@ -181,51 +164,37 @@ export class Cin7Service {
     const limit = Math.min(options?.limit ?? 50, 500);
     const search = (options?.search || "").trim();
 
-    try {
-      const params: any = { Page: page, Limit: limit };
-      if (search) params.Search = search;
+    const params: any = { Page: page, Limit: limit };
+    if (search) params.Search = search;
 
-      const response = await this.client.get("/Ref/Product", { params });
-      // Dear returns an array of product objects
-      const raw = (response.data as any[]) || [];
+    const resp = await this.client.get("/Ref/Product", { params });
+    const raw = (resp.data as any[]) || [];
 
-      // Light normalization to the fields you use in UI
-      const products: Cin7Product[] = raw.map((p: any) => ({
-        SKU: p?.SKU ?? p?.Sku ?? "",
-        Name: p?.Name,
-        Barcode: p?.Barcode,
-        Brand: p?.Brand,
-        LastModified: p?.LastModified,
-      }));
-
-      return products;
-    } catch (error) {
-      throw this.formatError(error as AxiosError);
-    }
+    return raw.map((p: any) => ({
+      SKU: p?.SKU ?? p?.Sku ?? "",
+      Name: p?.Name,
+      Barcode: p?.Barcode,
+      Brand: p?.Brand,
+      LastModified: p?.LastModified,
+    }));
   }
 
-  // (Optional) Availability — left as-is; adapt when you decide which Dear report you’ll use
+  // (Optional) Availability – leave as-is until you pick a Dear report
   async getProductAvailability(
     location: string,
     page = 1,
     limit = 500
   ): Promise<{ data: Cin7Availability[]; pagination: any }> {
-    try {
-      // Placeholder – availability/report endpoints differ in Dear.
-      // Keep existing shape so calling code doesn’t break.
-      const params = { location, page, limit: Math.min(limit, 500) };
-      const response = await this.client.get("/ProductAvailability", { params });
-      return {
-        data: (response.data as any[]) || [],
-        pagination: {
-          page,
-          limit,
-          total: (response.headers && (response.headers as any)["x-total-count"]) || 0,
-        },
-      };
-    } catch (error) {
-      throw this.formatError(error as AxiosError);
-    }
+    const params = { location, page, limit: Math.min(limit, 500) };
+    const resp = await this.client.get("/ProductAvailability", { params });
+    return {
+      data: (resp.data as any[]) || [],
+      pagination: {
+        page,
+        limit,
+        total: (resp.headers && (resp.headers as any)["x-total-count"]) || 0,
+      },
+    };
   }
 
   // ---------- Customers (unchanged) ----------
@@ -234,32 +203,25 @@ export class Cin7Service {
     page = 1,
     limit = 500
   ): Promise<{ data: Cin7Customer[]; pagination: any }> {
-    try {
-      const params = { Page: page, Limit: Math.min(limit, 500) };
-      const response = await this.client.get("/Customers", { params });
-      return {
-        data: (response.data as any[]) || [],
-        pagination: {
-          page,
-          limit,
-          total: (response.headers && (response.headers as any)["x-total-count"]) || 0,
-        },
-      };
-    } catch (error) {
-      throw this.formatError(error as AxiosError);
-    }
+    const resp = await this.client.get("/Customers", {
+      params: { Page: page, Limit: Math.min(limit, 500) },
+    });
+    return {
+      data: (resp.data as any[]) || [],
+      pagination: {
+        page,
+        limit,
+        total: (resp.headers && (resp.headers as any)["x-total-count"]) || 0,
+      },
+    };
   }
 
   // ---------- Quotes (Sale with NOTAUTHORISED) ----------
 
   async createQuote(saleData: Cin7Sale): Promise<any> {
-    try {
-      const payload = { ...saleData, OrderStatus: "NOTAUTHORISED" };
-      const response = await this.client.post("/Sale", payload);
-      return response.data;
-    } catch (error) {
-      throw this.formatError(error as AxiosError);
-    }
+    const payload = { ...saleData, OrderStatus: "NOTAUTHORISED" };
+    const resp = await this.client.post("/Sale", payload);
+    return resp.data;
   }
 }
 
