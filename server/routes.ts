@@ -26,9 +26,103 @@ function requireAuth(req: any, res: any, next: any) {
   next();
 }
 
+/**
+ * Minimal credential checker:
+ * - Prefer ADMIN_EMAIL / ADMIN_PASSWORD from env
+ * - Fallback to your provided admin credentials
+ * Return a user object if valid; otherwise null.
+ */
+function validateCredentials(email: string, password: string) {
+  const envEmail = process.env.ADMIN_EMAIL || "ronald@reiviloindustrial.co.za";
+  const envPassword = process.env.ADMIN_PASSWORD || "Ron@Reiv25";
+
+  if (email?.toLowerCase() === envEmail.toLowerCase() && password === envPassword) {
+    return {
+      id: "admin-1",
+      email: envEmail,
+      role: "admin",
+      // If you tie a user to a customer in your DB, set customerId here.
+      customerId: null,
+      name: "Reivilo Admin",
+    };
+  }
+
+  return null;
+}
+
+function publicUser(u: any) {
+  if (!u) return null;
+  return {
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    customerId: u.customerId ?? null,
+    name: u.name ?? null,
+  };
+}
+
 export function registerRoutes(app: Express): Server {
-  // Auth/session middleware
+  // Auth/session middleware (passport + session)
   setupAuth(app);
+
+  // -------------------------
+  // Auth API
+  // -------------------------
+
+  // Login
+  app.post("/api/login", async (req: any, res) => {
+    try {
+      const { email, password } = req.body || {};
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const user = validateCredentials(email, password);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Use passport's req.login so req.isAuthenticated() works
+      req.login(user, (err: any) => {
+        if (err) {
+          console.error("Login error:", err);
+          return res.status(500).json({ message: "Failed to start session" });
+        }
+        return res.json({ success: true, user: publicUser(req.user) });
+      });
+    } catch (error) {
+      console.error("Login handler error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Current session (handy for the frontend)
+  app.get("/api/session", (req: any, res) => {
+    res.json({
+      authenticated: !!(req.isAuthenticated && req.isAuthenticated()),
+      user: publicUser(req.user),
+    });
+  });
+
+  // Logout
+  app.post("/api/logout", (req: any, res) => {
+    try {
+      req.logout?.((err: any) => {
+        if (err) {
+          console.error("Logout error:", err);
+          return res.status(500).json({ message: "Logout failed" });
+        }
+        // destroy session cookie if present
+        req.session?.destroy?.(() => {
+          res.clearCookie?.("connect.sid");
+          return res.json({ success: true });
+        });
+      });
+    } catch (e) {
+      console.error("Logout handler error:", e);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
 
   // -------------------------
   // Health
