@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import passport from "passport";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { cin7Service } from "./services/cin7";
@@ -26,93 +27,80 @@ function requireAuth(req: any, res: any, next: any) {
   next();
 }
 
-/**
- * Minimal credential checker:
- * - Prefer ADMIN_EMAIL / ADMIN_PASSWORD from env
- * - Fallback to your provided admin credentials
- * Return a user object if valid; otherwise null.
- */
-function validateCredentials(email: string, password: string) {
-  const envEmail = process.env.ADMIN_EMAIL || "ronald@reiviloindustrial.co.za";
-  const envPassword = process.env.ADMIN_PASSWORD || "Ron@Reiv25";
-
-  if (email?.toLowerCase() === envEmail.toLowerCase() && password === envPassword) {
-    return {
-      id: "admin-1",
-      email: envEmail,
-      role: "admin",
-      // If you tie a user to a customer in your DB, set customerId here.
-      customerId: null,
-      name: "Reivilo Admin",
-    };
-  }
-
-  return null;
-}
-
-function publicUser(u: any) {
-  if (!u) return null;
-  return {
-    id: u.id,
-    email: u.email,
-    role: u.role,
-    customerId: u.customerId ?? null,
-    name: u.name ?? null,
-  };
-}
+const publicUser = (user: any) =>
+  user
+    ? {
+        id: user.id ?? user.userId ?? user.email,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        customerId: user.customerId,
+      }
+    : null;
 
 export function registerRoutes(app: Express): Server {
-  // Auth/session middleware (passport + session)
+  // Initialize passport/session
   setupAuth(app);
 
-  // -------------------------
-  // Auth API
-  // -------------------------
-
-  // Login
-  app.post("/api/login", async (req: any, res) => {
-    try {
-      const { email, password } = req.body || {};
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
-      }
-
-      const user = validateCredentials(email, password);
-      if (!user) {
-        return res.status(401).json({ message: "Invalid email or password" });
-      }
-
-      // Use passport's req.login so req.isAuthenticated() works
-      req.login(user, (err: any) => {
-        if (err) {
-          console.error("Login error:", err);
-          return res.status(500).json({ message: "Failed to start session" });
-        }
-        return res.json({ success: true, user: publicUser(req.user) });
-      });
-    } catch (error) {
-      console.error("Login handler error:", error);
-      res.status(500).json({ message: "Login failed" });
-    }
+  // Prevent cached logged-out pages
+  app.use((_: any, res: any, next: any) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
   });
 
-  // Current session (handy for the frontend)
+  // -------------------------
+  // Auth API (Passport-backed)
+  // -------------------------
+
+  // Session probe
   app.get("/api/session", (req: any, res) => {
-    res.json({
-      authenticated: !!(req.isAuthenticated && req.isAuthenticated()),
-      user: publicUser(req.user),
-    });
+    if (req.isAuthenticated && req.isAuthenticated()) {
+      return res.json({ authenticated: true, user: publicUser(req.user) });
+    }
+    return res.json({ authenticated: false });
+  });
+
+  // Login (expects { email, password })
+  app.post("/api/login", (req: any, res: any, next: any) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) return next(err);
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+
+      req.logIn(user, (loginErr: any) => {
+        if (loginErr) return next(loginErr);
+
+        // Regenerate & save the session to avoid the "bounce back to login" issue
+        if (req.session && typeof req.session.regenerate === "function") {
+          return req.session.regenerate((regenErr: any) => {
+            if (regenErr) return next(regenErr);
+            req.login(user, (logErr: any) => {
+              if (logErr) return next(logErr);
+              req.session.save((saveErr: any) => {
+                if (saveErr) return next(saveErr);
+                return res.json({ success: true, user: publicUser(user) });
+              });
+            });
+          });
+        }
+
+        req.session?.save?.((saveErr: any) => {
+          if (saveErr) return next(saveErr);
+          return res.json({ success: true, user: publicUser(user) });
+        });
+      });
+    })(req, res, next);
   });
 
   // Logout
-  app.post("/api/logout", (req: any, res) => {
+  app.post("/api/logout", (req: any, res: any) => {
     try {
       req.logout?.((err: any) => {
         if (err) {
           console.error("Logout error:", err);
           return res.status(500).json({ message: "Logout failed" });
         }
-        // destroy session cookie if present
         req.session?.destroy?.(() => {
           res.clearCookie?.("connect.sid");
           return res.json({ success: true });
@@ -149,13 +137,18 @@ export function registerRoutes(app: Express): Server {
   // -------------------------
   app.get("/api/warehouses", async (_req, res) => {
     try {
-      const warehouses = await cin7Service.getWarehouses();
-      const out = (warehouses || []).map((w: any) => ({
-        // ✅ Cin7 returns "Id" (capital I, lowercase d), not "ID"
-        id: w.Id,
-        name: w.Name,
-        isDefault: !!w.IsDefault,
+      // Support either getWarehouses() or getLocations()
+      const raw = (await (cin7Service as any).getWarehouses?.()) ??
+                  (await (cin7Service as any).getLocations?.()) ??
+                  [];
+
+      const out = (raw || []).map((w: any) => ({
+        // Be defensive about field names coming from Cin7
+        id: w.Id ?? w.ID ?? w.id ?? w.LocationId ?? null,
+        name: w.Name ?? w.LocationName ?? w.name ?? "Unknown",
+        isDefault: !!(w.IsDefault ?? w.isDefault),
       }));
+
       res.json(out);
     } catch (error) {
       console.error("Error fetching warehouses:", error);
@@ -169,18 +162,26 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/products", async (req, res) => {
     try {
       const q = ((req.query.q as string) || "").trim();
-      // accept either ?limit= or ?pageSize=; default 50
       const limit =
         parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10) || 50;
 
-      const products = await cin7Service.getProducts({
+      const result = await (cin7Service as any).getProducts?.({
         search: q,
         limit,
       });
 
+      // Accept multiple shapes from the service
+      const items =
+        Array.isArray(result)
+          ? result
+          : result?.data ??
+            result?.items ??
+            result?.Products ??
+            [];
+
       res.json({
-        items: products || [],
-        total: (products || []).length,
+        items,
+        total: Array.isArray(items) ? items.length : 0,
       });
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -228,8 +229,8 @@ export function registerRoutes(app: Express): Server {
   // -------------------------
   app.get("/api/cart", requireAuth, (req: any, res) => {
     try {
-      const userId = req.user!.id;
-      const cart = carts.get(userId) || { items: [], location: null };
+      const uid = String(req.user?.id ?? req.user?.email ?? "anon");
+      const cart = carts.get(uid) || { items: [], location: null };
       res.json(cart);
     } catch (error) {
       console.error("Error fetching cart:", error);
@@ -239,7 +240,7 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/cart", requireAuth, (req: any, res) => {
     try {
-      const userId = req.user!.id;
+      const uid = String(req.user?.id ?? req.user?.email ?? "anon");
       const { items, location } = req.body;
 
       const cart: Cart = {
@@ -247,7 +248,7 @@ export function registerRoutes(app: Express): Server {
         location: location ?? null,
       };
 
-      carts.set(userId, cart);
+      carts.set(uid, cart);
       res.json(cart);
     } catch (error) {
       console.error("Error updating cart:", error);
@@ -261,7 +262,8 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/cart/checkout", requireAuth, async (req: any, res) => {
     try {
       const user = req.user!;
-      const cart = carts.get(user.id);
+      const uid = String(user?.id ?? user?.email ?? "anon");
+      const cart = carts.get(uid);
 
       if (!cart || !cart.items || cart.items.length === 0) {
         return res.status(400).json({ message: "Cart is empty" });
@@ -300,23 +302,23 @@ export function registerRoutes(app: Express): Server {
 
         // Save locally
         const quote = await storage.createQuote({
-          erpSaleId: cin7Response.ID || cin7Response.SaleID,
+          erpSaleId: (cin7Response as any).ID || (cin7Response as any).SaleID,
           status: "NOTAUTHORISED",
           payload: JSON.stringify({
             cin7_response: cin7Response,
             original_cart: cart,
-            user_id: user.id,
+            user_id: uid,
             customer_id: customer.id,
           }),
         });
 
         // Clear cart on success
-        carts.delete(user.id);
+        carts.delete(uid);
 
         res.json({
           success: true,
           quote_id: quote.id,
-          erp_sale_id: cin7Response.ID || cin7Response.SaleID,
+          erp_sale_id: (cin7Response as any).ID || (cin7Response as any).SaleID,
           cin7_response: cin7Response,
         });
       } catch (cin7Error: any) {
@@ -325,15 +327,15 @@ export function registerRoutes(app: Express): Server {
         const quote = await storage.createQuote({
           status: "FAILED",
           payload: JSON.stringify({
-            error: cin7Error.message,
+            error: cin7Error?.message,
             original_cart: cart,
-            user_id: user.id,
-            customer_id: customer.id,
+            user_id: uid,
+            customer_id: customer?.id,
           }),
         });
 
         res.status(500).json({
-          message: `Quote creation failed: ${cin7Error.message}`,
+          message: `Quote creation failed: ${cin7Error?.message || "Unknown error"}`,
           quote_id: quote.id,
         });
       }
