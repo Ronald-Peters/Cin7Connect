@@ -1,0 +1,146 @@
+What’s breaking (from the screenshot)
+
+server/sync.ts:L38
+upsertProductAvailability doesn’t exist on DatabaseStorage (the method is likely upsertAvailability).
+
+server/sync.ts:L90
+You’re upserting products and including a category field that isn’t in your Product type.
+
+server/sync.ts:L140
+You’re upserting customers and including a contactPerson field that isn’t in your Customer type.
+
+server/sync.ts:L230
+updateSyncStatus doesn’t exist on DatabaseStorage.
+
+So the workflow’s test job (usually tsc --noEmit) fails, which then skips your deploy jobs.
+
+Quick fixes (make these edits and push)
+1) Rename the availability method call
+
+In server/sync.ts:
+
+// OLD
+await storage.upsertProductAvailability(availabilityRows);
+
+// NEW
+await storage.upsertAvailability(availabilityRows);
+
+2) Remove or map unknown fields in upserts
+
+The object literals you pass to storage.upsertProducts and storage.upsertCustomers
+must match the known properties of your Product and Customer types.
+
+Products block (around L90):
+
+// OLD (has category which isn't in Product type)
+const productUpserts: Partial<Product>[] = cin7Products.map(p => ({
+  id: p.id,
+  sku: p.sku,
+  name: p.name,
+  brand: p.brand,
+  barcode: p.barcode,
+  createdAt: p.createdAt,
+  category: p.category, // ❌ remove or rename if your schema has a column for it
+}));
+
+// NEW (drop category for now)
+const productUpserts: Partial<Product>[] = cin7Products.map(p => ({
+  id: p.id,
+  sku: p.sku,
+  name: p.name,
+  brand: p.brand,
+  barcode: p.barcode,
+  createdAt: p.createdAt,
+  // If you want category, add it to your DB schema + Product type first.
+}));
+
+
+Customers block (around L140):
+
+// OLD (has contactPerson which isn't in Customer type)
+const customerUpserts: Partial<Customer>[] = cin7Customers.map(c => ({
+  id: c.id,
+  erpCustomerId: c.erpId,
+  companyName: c.companyName,
+  terms: c.terms,
+  priceTier: c.priceTier,
+  contactPerson: c.contactPerson, // ❌ remove or map
+}));
+
+// NEW (drop contactPerson for now)
+const customerUpserts: Partial<Customer>[] = cin7Customers.map(c => ({
+  id: c.id,
+  erpCustomerId: c.erpId,
+  companyName: c.companyName,
+  terms: c.terms,
+  priceTier: c.priceTier,
+  // If you want to keep this, add `contact_person text` to your table,
+  // update the Supabase schema and extend the Customer type accordingly.
+}));
+
+
+If you do want category and contactPerson:
+
+Add columns in Supabase (SQL),
+
+Update your TypeScript Product/Customer types,
+
+Then keep those fields in the upserts.
+
+3) Use the correct sync-status method name
+
+Either change the calls in sync.ts or add the method to your storage interface/impl.
+
+Simplest: rename calls to an existing method if it’s already there (e.g., setSyncStatus):
+
+// OLD
+await storage.updateSyncStatus('running');
+
+// NEW (match your storage API)
+await storage.setSyncStatus('running');
+
+
+If there’s no status method at all, add one to DatabaseStorage and its implementation:
+
+// In server/storage.ts (or wherever the interface is)
+export interface DatabaseStorage {
+  // ...
+  setSyncStatus(status: 'idle' | 'running' | 'error', detail?: string): Promise<void>;
+  upsertAvailability(rows: AvailabilityRow[]): Promise<void>;
+  // upsertProducts(...), upsertCustomers(...), etc.
+}
+
+
+And implement setSyncStatus in your Supabase/DB storage class (even if it’s a no-op to start).
+
+Sanity check before pushing again
+
+Run this locally in Replit (or your terminal):
+
+npm run typecheck   # often runs: tsc --noEmit
+# or
+npx tsc --noEmit
+
+
+Fix any remaining TS errors it shows. Then:
+
+git add -A
+git commit -m "Fix storage method names and upsert shapes"
+git push
+
+
+GitHub Actions should now pass the test job, and your deploy steps will run.
+
+Optional (keeping those extra fields)
+
+If you want category (products) and contactPerson (customers) in your DB:
+
+Supabase SQL:
+
+alter table public.products add column if not exists category text;
+alter table public.customers add column if not exists contact_person text;
+
+
+Update TS types (Product/Customer) to include those fields.
+
+Put the fields back in your upserts.
