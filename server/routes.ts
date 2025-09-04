@@ -71,22 +71,12 @@ export function registerRoutes(app: Express): Server {
       req.logIn(user, (loginErr: any) => {
         if (loginErr) return next(loginErr);
 
-        // Regenerate & save the session to avoid the "bounce back to login" issue
-        if (req.session && typeof req.session.regenerate === "function") {
-          return req.session.regenerate((regenErr: any) => {
-            if (regenErr) return next(regenErr);
-            req.login(user, (logErr: any) => {
-              if (logErr) return next(logErr);
-              req.session.save((saveErr: any) => {
-                if (saveErr) return next(saveErr);
-                return res.json({ success: true, user: publicUser(user) });
-              });
-            });
-          });
-        }
-
-        req.session?.save?.((saveErr: any) => {
-          if (saveErr) return next(saveErr);
+        // Save the session after successful login
+        req.session.save((saveErr: any) => {
+          if (saveErr) {
+            console.error("Session save error:", saveErr);
+            return next(saveErr);
+          }
           return res.json({ success: true, user: publicUser(user) });
         });
       });
@@ -110,6 +100,14 @@ export function registerRoutes(app: Express): Server {
       console.error("Logout handler error:", e);
       res.status(500).json({ message: "Logout failed" });
     }
+  });
+
+  // Get current user (authentication state)
+  app.get("/api/user", (req: any, res) => {
+    if (req.isAuthenticated && req.isAuthenticated()) {
+      return res.json(publicUser(req.user));
+    }
+    return res.status(401).json({ message: "Not authenticated" });
   });
 
   // -------------------------
