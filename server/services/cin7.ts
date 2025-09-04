@@ -18,6 +18,9 @@ export interface Cin7Product {
   Name?: string;
   Barcode?: string;
   Brand?: string;
+  Category?: string;
+  DefaultSellPrice?: string;
+  ImageURL?: string;
   LastModified?: string;
 }
 
@@ -175,6 +178,9 @@ export class Cin7Service {
       Name: p?.Name,
       Barcode: p?.Barcode,
       Brand: p?.Brand,
+      Category: p?.Category,
+      DefaultSellPrice: p?.DefaultSellPrice,
+      ImageURL: p?.ImageURL || p?.Image,
       LastModified: p?.LastModified,
     }));
   }

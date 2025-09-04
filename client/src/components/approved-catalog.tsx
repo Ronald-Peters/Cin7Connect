@@ -180,19 +180,33 @@ export function ApprovedCatalog() {
           {displayProducts.map((product: any) => (
             <Card key={product.id} className="hover:shadow-lg transition-all duration-200 border-[#e2e8f0] hover:border-[#1e3a8a]">
               <CardContent className="p-6">
-                {/* Product Header */}
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-[#1e3a8a] to-[#3b82f6] rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                    {product.sku?.substring(0, 2) || 'P'}
+                {/* Product Image and Header */}
+                <div className="mb-4">
+                  {product.ImageURL ? (
+                    <img 
+                      src={product.ImageURL} 
+                      alt={product.name || product.Name}
+                      className="w-full h-32 object-cover rounded-lg mb-3"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div className={`w-full h-32 bg-gradient-to-br from-[#1e3a8a] to-[#3b82f6] rounded-lg flex items-center justify-center text-white font-bold text-2xl mb-3 ${product.ImageURL ? 'hidden' : 'flex'}`}>
+                    {(product.sku || product.SKU)?.substring(0, 2) || 'P'}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-[#1e40af] truncate">
-                      {product.name}
-                    </h3>
-                    <p className="text-xs text-[#64748b] font-mono">
-                      {product.sku}
+                  <h3 className="text-sm font-semibold text-[#1e40af] truncate">
+                    {product.name || product.Name}
+                  </h3>
+                  <p className="text-xs text-[#64748b] font-mono mb-1">
+                    {product.sku || product.SKU}
+                  </p>
+                  {(product.category || product.Category) && (
+                    <p className="text-xs text-[#64748b]">
+                      Category: {product.category || product.Category}
                     </p>
-                  </div>
+                  )}
                 </div>
                 
                 {/* Stock Status */}
@@ -220,12 +234,14 @@ export function ApprovedCatalog() {
                   </div>
                 </div>
                 
-                {/* Price */}
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-lg font-bold text-[#1e3a8a]">
-                    R {product.price?.toLocaleString() || '0'}
-                  </span>
-                  <span className="text-xs text-[#64748b] bg-[#f1f5f9] px-2 py-1 rounded">ZAR</span>
+                {/* VIP Price from Cin7 */}
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-yellow-800">VIP Price:</span>
+                    <span className="text-lg font-bold text-yellow-900">
+                      R {parseFloat(product.DefaultSellPrice || product.price || '0').toFixed(2)}
+                    </span>
+                  </div>
                 </div>
                 
                 {/* Actions */}
