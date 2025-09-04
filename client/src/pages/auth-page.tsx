@@ -50,7 +50,7 @@ export default function AuthPage() {
                 data-testid="img-logo"
                 onError={(e) => {
                   const img = e.target as HTMLImageElement;
-                  img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 68'%3E%3Ctext x='75' y='34' font-family='Arial' font-size='24' font-weight='bold' text-anchor='middle' fill='%231E3A8A'%3EReivilo%3C/text%3E%3C/svg%3E";
+                  img.style.display = 'none';
                 }}
               />
             </div>
@@ -58,7 +58,7 @@ export default function AuthPage() {
               Reivilo B2B Portal
             </h1>
             <p className="text-muted-foreground" data-testid="text-app-subtitle">
-              Family Business Values • Cin7 Integrated Commerce • Since 1980
+              Family Business Values
             </p>
           </div>
 
@@ -167,19 +167,19 @@ export default function AuthPage() {
             <div className="inline-flex items-center justify-center w-24 h-24 bg-reivilo-purple/15 rounded-full mb-6 border-2 border-reivilo-purple/20">
               <img 
                 src="/reivilo-logo.jpg" 
-                alt="Reivilo 45 Years" 
+                alt="Reivilo Logo" 
                 className="h-16 w-auto opacity-80 object-contain"
                 onError={(e) => {
                   const img = e.target as HTMLImageElement;
-                  img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 68'%3E%3Ctext x='75' y='34' font-family='Arial' font-size='24' font-weight='bold' text-anchor='middle' fill='%231E3A8A'%3EReivilo%3C/text%3E%3C/svg%3E";
+                  img.style.display = 'none';
                 }}
               />
             </div>
             <h2 className="text-3xl font-bold text-foreground mb-4" data-testid="text-hero-title">
-              45 Years of Excellence
+              Excellence in Service
             </h2>
             <p className="text-lg text-muted-foreground mb-8" data-testid="text-hero-description">
-              Family business values with cutting-edge technology. Real-time inventory, customer-specific pricing, and seamless quote generation since 1980.
+              Family business values with cutting-edge technology. Real-time inventory, customer-specific pricing, and seamless quote generation.
             </p>
           </div>
 
