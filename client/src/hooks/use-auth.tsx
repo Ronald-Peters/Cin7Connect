@@ -52,8 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Welcome back!",
         description: "You have been successfully logged in.",
       });
-      // Redirect to home after successful login
-      window.location.href = "/";
+      // Force a page refresh to ensure proper auth state
+      setTimeout(() => {
+        window.location.replace("/");
+      }, 100);
     },
     onError: (error: Error) => {
       toast({
