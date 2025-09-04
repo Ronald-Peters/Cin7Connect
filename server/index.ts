@@ -75,7 +75,7 @@ app.post("/api/logout", (req, res) => {
 app.get("/api/auth/me", (req, res) => {
   const user = (req.session as any)?.user as User | undefined;
   if (!user) return res.status(401).json({ message: "Not authenticated" });
-  res.json({ ok: true, user });
+  res.json(user);
 });
 
 // ---------- Core (Cin7) ----------
