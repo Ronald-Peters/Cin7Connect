@@ -126,6 +126,7 @@ async function corePost(apiPath: string, body: any) {
 
 // ---------- Health / connectivity ----------
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/healthz", (_req, res) => res.send("OK"));
 
 app.get("/api/test-connection", async (_req, res) => {
   try {
@@ -404,7 +405,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // ---------- Start ----------
-const PORT = Number(process.env.PORT || 5000);
+const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
 app.listen(PORT, HOST, () => {
   console.log(`🚀 API listening on http://${HOST}:${PORT}`);
