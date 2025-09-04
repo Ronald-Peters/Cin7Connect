@@ -363,6 +363,9 @@ const publicPath =
   process.env.NODE_ENV === "production"
     ? path.resolve(__dirname, "./public")
     : path.resolve(__dirname, "../dist/public");
+
+// Serve all static files from the public directory
+app.use(express.static(publicPath));
 app.use("/assets", express.static(path.join(publicPath, "assets")));
 log(`📁 Serving assets from: ${path.join(publicPath, "assets")}`);
 
@@ -390,7 +393,7 @@ function sendSpa(req: Request, res: Response) {
 // Home should be the landing page
 app.get("/", sendSpa);
 // And let these routes also load the SPA so the React router can handle them
-app.get(["/login", "/admin", "/app", "/catalog/*", "/profile", "/cart"], sendSpa);
+app.get(["/auth", "/login", "/admin", "/app", "/catalog/*", "/profile", "/cart"], sendSpa);
 
 // ---------- Error handler ----------
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -401,7 +404,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // ---------- Start ----------
-const PORT = Number(process.env.PORT || 8080);
+const PORT = Number(process.env.PORT || 5000);
 const HOST = "0.0.0.0";
 app.listen(PORT, HOST, () => {
   console.log(`🚀 API listening on http://${HOST}:${PORT}`);
