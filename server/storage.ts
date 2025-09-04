@@ -13,11 +13,15 @@ export interface IStorage {
   createUser(user: any): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   getAllActiveCustomers(): Promise<Customer[]>;
+  getAllCustomers(): Promise<Customer[]>;
   updateCustomer(id: number, updates: Partial<Customer>): Promise<Customer | undefined>;
+  updateCustomerStatus(id: string, active: boolean): Promise<void>;
+  createCustomer(customer: Partial<Customer>): Promise<Customer>;
   syncCin7Customers(): Promise<void>;
   
   // Admin user methods
   getAllAdminUsers(): Promise<User[]>;
+  createAdminUser(user: any): Promise<User>;
   deleteAdminUser(id: string): Promise<boolean>;
   
   // Customer methods
@@ -92,6 +96,25 @@ export class DatabaseStorage implements IStorage {
 
   async getAllActiveCustomers(): Promise<Customer[]> {
     return await db.select().from(customers).orderBy(asc(customers.companyName));
+  }
+
+  async getAllCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers).orderBy(asc(customers.companyName));
+  }
+
+  async createCustomer(customerData: Partial<Customer>): Promise<Customer> {
+    const [created] = await db
+      .insert(customers)
+      .values(customerData as any)
+      .returning();
+    return created;
+  }
+
+  async updateCustomerStatus(id: string, active: boolean): Promise<void> {
+    await db
+      .update(customers)
+      .set({ isActive: active })
+      .where(eq(customers.id, parseInt(id)));
   }
 
   async updateCustomer(id: number, updates: Partial<Customer>): Promise<Customer | undefined> {
@@ -357,6 +380,20 @@ export class DatabaseStorage implements IStorage {
   // Admin user methods
   async getAllAdminUsers(): Promise<User[]> {
     return await db.select().from(users).where(eq(users.role, 'admin')).orderBy(asc(users.email));
+  }
+
+  async createAdminUser(userData: any): Promise<User> {
+    const insertData: any = {
+      email: userData.email,
+      password: userData.password,
+      name: userData.name,
+      customerId: null,
+      role: 'admin',
+      isActive: true,
+    };
+    
+    const result: any = await db.insert(users).values(insertData).returning();
+    return result[0];
   }
 
   async deleteAdminUser(id: string): Promise<boolean> {

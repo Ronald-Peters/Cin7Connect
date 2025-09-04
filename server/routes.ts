@@ -110,6 +110,116 @@ export function registerRoutes(app: Express): Server {
     return res.status(401).json({ message: "Not authenticated" });
   });
 
+  // Authentication check endpoint (alternative to /api/user)
+  app.get("/api/auth/me", (req: any, res) => {
+    if (req.isAuthenticated && req.isAuthenticated()) {
+      return res.json(publicUser(req.user));
+    }
+    return res.status(401).json({ message: "Not authenticated" });
+  });
+
+  // -------------------------
+  // Admin Routes (require admin role)
+  // -------------------------
+  function requireAdmin(req: any, res: any, next: any) {
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    next();
+  }
+
+  // Get all customers for admin
+  app.get("/api/customers", requireAdmin, async (req: any, res) => {
+    try {
+      const customers = await storage.getAllCustomers();
+      res.json({ customers: customers || [] });
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+
+  // Create new customer
+  app.post("/api/customers", requireAdmin, async (req: any, res) => {
+    try {
+      const { name, email, company } = req.body;
+      
+      if (!name || !email || !company) {
+        return res.status(400).json({ message: "Name, email, and company are required" });
+      }
+
+      const customer = await storage.createCustomer({
+        companyName: company,
+        erpCustomerId: email.split('@')[0], // Use email prefix as temp ERP ID
+        terms: "Net 30",
+        priceTier: "Wholesale",
+        contacts: JSON.stringify([{ name, email, role: "Primary Contact" }])
+      });
+
+      res.json({ success: true, customer });
+    } catch (error) {
+      console.error("Error creating customer:", error);
+      res.status(500).json({ message: "Failed to create customer" });
+    }
+  });
+
+  // Toggle customer active status
+  app.patch("/api/customers/:id/status", requireAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { active } = req.body;
+      
+      await storage.updateCustomerStatus(id, active);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating customer status:", error);
+      res.status(500).json({ message: "Failed to update customer status" });
+    }
+  });
+
+  // Get all admin users
+  app.get("/api/admin/users", requireAdmin, async (req: any, res) => {
+    try {
+      const users = await storage.getAllAdminUsers();
+      // Return the admin users including the configured ones
+      const adminUsers = [
+        { id: 1, name: "Ronald", email: "ronald@reiviloindustrial.co.za", role: "admin" },
+        { id: 2, name: "Kai", email: "sales2@reiviloindustrial.co.za", role: "admin" },
+        ...(users || [])
+      ];
+      res.json({ users: adminUsers });
+    } catch (error) {
+      console.error("Error fetching admin users:", error);
+      res.status(500).json({ message: "Failed to fetch admin users" });
+    }
+  });
+
+  // Create new admin user
+  app.post("/api/admin/users", requireAdmin, async (req: any, res) => {
+    try {
+      const { name, email, password } = req.body;
+      
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: "Name, email, and password are required" });
+      }
+
+      const user = await storage.createAdminUser({
+        name,
+        email,
+        password,
+        role: 'admin'
+      });
+
+      res.json({ success: true, user });
+    } catch (error) {
+      console.error("Error creating admin user:", error);
+      res.status(500).json({ message: "Failed to create admin user" });
+    }
+  });
+
   // -------------------------
   // Health
   // -------------------------
