@@ -1,0 +1,38 @@
+{
+  "name": "reivilo-b2b",
+  "production_branch": "main",
+  "build": {
+    "command": "npm run build:frontend",
+    "destination": "dist",
+    "root_dir": ".",
+    "environment_variables": {
+      "NODE_VERSION": "20",
+      "VITE_API_BASE_URL": "https://reivilo-b2b-api.a.run.app",
+      "VITE_APP_NAME": "Reivilo B2B Portal"
+    }
+  },
+  "preview": {
+    "environment_variables": {
+      "VITE_API_BASE_URL": "https://reivilo-b2b-api-staging.a.run.app",
+      "VITE_APP_NAME": "Reivilo B2B Portal (Preview)"
+    }
+  },
+  "redirects": [
+    {
+      "from": "/api/*",
+      "to": "https://reivilo-b2b-api.a.run.app/api/:splat",
+      "status": 200
+    }
+  ],
+  "headers": [
+    {
+      "source": "/**",
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+      }
+    }
+  ]
+}

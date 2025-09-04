@@ -221,10 +221,95 @@ export function registerRoutes(app: Express): Server {
   });
 
   // -------------------------
-  // Health
+  // Health & Monitoring
   // -------------------------
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
+  });
+
+  app.get("/healthz", (_req, res) => {
+    res.json({ 
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      service: "reivilo-b2b-api"
+    });
+  });
+
+  // -------------------------
+  // Production Sync Endpoints (Secured)
+  // -------------------------
+  function requireSyncToken(req: any, res: any, next: any) {
+    const token = req.headers['x-sync-token'] || req.query.token;
+    const expectedToken = process.env.SYNC_TOKEN || 'default-sync-token';
+    
+    if (token !== expectedToken) {
+      return res.status(401).json({ message: 'Unauthorized sync request' });
+    }
+    next();
+  }
+
+  // Sync product availability (every 5 minutes)
+  app.post("/api/sync/availability", requireSyncToken, async (_req, res) => {
+    try {
+      const { ProductSyncService } = await import('./sync');
+      const result = await ProductSyncService.syncAvailability();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Availability sync error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Sync failed", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Sync products (hourly)  
+  app.post("/api/sync/products", requireSyncToken, async (_req, res) => {
+    try {
+      const { ProductSyncService } = await import('./sync');
+      const result = await ProductSyncService.syncProducts();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Products sync error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Sync failed", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Sync customers (hourly)
+  app.post("/api/sync/customers", requireSyncToken, async (_req, res) => {
+    try {
+      const { ProductSyncService } = await import('./sync');
+      const result = await ProductSyncService.syncCustomers();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Customers sync error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Sync failed", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Full system sync (nightly)
+  app.post("/api/sync/full", requireSyncToken, async (_req, res) => {
+    try {
+      const { ProductSyncService } = await import('./sync');
+      const result = await ProductSyncService.fullSync();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Full sync error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Sync failed", 
+        error: error.message 
+      });
+    }
   });
 
   // -------------------------
