@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import session from "express-session";
 import passport from "passport";
+// @ts-ignore - connect-sqlite3 doesn't have types
 import SQLiteStoreFactory from "connect-sqlite3";
 
 /**

@@ -127,7 +127,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Get pricing data (this works!)
-      const { data: allProducts } = await cin7Service.getProducts(1, 1000);
+      const allProducts = await cin7Service.getProducts({ page: 1, limit: 1000 });
       
       // Create pricing map
       const pricingMap = new Map();
