@@ -95,7 +95,7 @@ export function ApprovedCatalog() {
         <div className="px-6 py-6">
           <div className="text-center mb-6">
             <h1 className="text-4xl font-bold text-[#1e3a8a] mb-2">Product Catalog</h1>
-            <p className="text-lg text-[#64748b]">Multi-warehouse inventory with real-time Cin7 sync</p>
+            <p className="text-lg text-[#64748b]">Multi-warehouse inventory with real-time sync</p>
           </div>
           
           {/* Search Bar - Approved Layout */}

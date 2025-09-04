@@ -49,7 +49,6 @@ export function Header() {
                 >
                   Reivilo B2B
                 </h1>
-                <span className="text-xs text-muted-foreground leading-tight">Since 1980</span>
               </div>
             </div>
             <nav className="hidden md:flex space-x-6">
