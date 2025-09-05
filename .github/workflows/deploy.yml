@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   test:
@@ -52,10 +53,11 @@ jobs:
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: ${{ secrets.CLOUD_RUN_SERVICE }}          # e.g. reivilo-b2b-api
-          region:  ${{ secrets.GOOGLE_CLOUD_REGION }}        # e.g. africa-south1
+          service: ${{ secrets.CLOUD_RUN_SERVICE }}      # e.g. reivilo-b2b-api
+          region:  ${{ secrets.GOOGLE_CLOUD_REGION }}    # e.g. africa-south1
           source: .
-          flags: >-
+          # Use a block scalar so colons/commas are treated as plain text
+          flags: |
             --allow-unauthenticated
             --memory=1Gi
             --cpu=1
