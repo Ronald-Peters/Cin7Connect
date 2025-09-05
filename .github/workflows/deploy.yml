@@ -53,8 +53,8 @@ jobs:
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: ${{ secrets.CLOUD_RUN_SERVICE }}      # e.g. reivilo-b2b-api
-          region:  ${{ secrets.GOOGLE_CLOUD_REGION }}    # e.g. africa-south1
+          service: ${{ secrets.CLOUD_RUN_SERVICE }}
+          region: ${{ secrets.GOOGLE_CLOUD_REGION }}
           source: .
           flags: >-
             --allow-unauthenticated
