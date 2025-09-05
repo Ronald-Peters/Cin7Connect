@@ -56,8 +56,7 @@ jobs:
           service: ${{ secrets.CLOUD_RUN_SERVICE }}      # e.g. reivilo-b2b-api
           region:  ${{ secrets.GOOGLE_CLOUD_REGION }}    # e.g. africa-south1
           source: .
-          # Use a block scalar so colons/commas are treated as plain text
-          flags: |
+          flags: >-
             --allow-unauthenticated
             --memory=1Gi
             --cpu=1
