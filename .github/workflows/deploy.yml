@@ -53,8 +53,8 @@ jobs:
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: ${{ secrets.CLOUD_RUN_SERVICE }}
-          region: ${{ secrets.GOOGLE_CLOUD_REGION }}
+          service: ${{ secrets.CLOUD_RUN_SERVICE }}      # e.g. reivilo-b2b-api
+          region:  ${{ secrets.GOOGLE_CLOUD_REGION }}    # e.g. africa-south1
           source: .
           flags: >-
             --allow-unauthenticated
@@ -65,4 +65,6 @@ jobs:
             --set-secrets=DATABASE_URL=DATABASE_URL:latest,CIN7_ACCOUNT_ID=CIN7_ACCOUNT_ID:latest,CIN7_APP_KEY=CIN7_APP_KEY:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest,SYNC_TOKEN=SYNC_TOKEN:latest
 
       - name: Show service URL
-        run: echo "Cloud Run URL: ${{ steps.deploy.outputs.url }}"
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: echo "Cloud Run URL: $URL"
