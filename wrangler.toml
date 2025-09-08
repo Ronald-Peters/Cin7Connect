@@ -1,4 +1,3 @@
 # wrangler.toml  (repo root)
 name = "cin7connect-pages"
 pages_build_output_dir = "dist"
-# trigger build
