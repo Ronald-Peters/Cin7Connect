@@ -230,11 +230,12 @@ app.get("/api/availability", async (req, res) => {
     let all: any[] = [];
     let page = 1;
     for (;;) {
-      const pageData = (await corePost("ProductAvailability", {
-        Page: page,
-        Limit: sku ? 50 : 1000,
-      })) as any;
-      const rows = pageData.ProductAvailability || [];
+      const pageData = await cin7Service.getProductAvailability(
+        "", // empty location to get all locations
+        page,
+        sku ? 50 : 1000
+      );
+      const rows = pageData.data || [];
       all = all.concat(rows);
       if (rows.length < 1000 || sku) break;
       page += 1;
