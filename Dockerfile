@@ -18,8 +18,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build application
-RUN npm run build
+# Build application (frontend and backend)
+RUN npx vite build --base=/
+RUN npm run build:server
+RUN if [ -d "attached_assets" ]; then cp -r attached_assets dist/ || true; fi
 
 # Production image, copy all files and run the app
 FROM base AS runner
