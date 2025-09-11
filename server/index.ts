@@ -397,6 +397,14 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
 
+// Add environment validation for production
+if (process.env.NODE_ENV === 'production') {
+  log(`🔍 Production environment check:`);
+  log(`   PORT: ${PORT}`);
+  log(`   NODE_ENV: ${process.env.NODE_ENV}`);
+  log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET'}`);
+}
+
 // Add startup logging
 log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 log(`📂 Working directory: ${process.cwd()}`);

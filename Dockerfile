@@ -17,10 +17,15 @@ RUN npm ci
 
 # Copy source code
 COPY . .
+# Ensure build script has correct permissions
+RUN chmod +x build.sh 2>/dev/null || true
 
-# Build application using our fixed build script
-COPY build.sh ./
-RUN chmod +x build.sh && ./build.sh
+# Build application (Cloud Build compatible)
+RUN npm run build:client
+RUN mkdir -p dist/public && cp -r client/client/dist/* dist/public/ 2>/dev/null || cp -r client/dist/* dist/public/ 2>/dev/null || true
+RUN npm run build:server
+RUN if [ -d "attached_assets" ]; then cp -r attached_assets dist/ || true; fi
+RUN if [ -f "dist/public/index.html" ]; then cp dist/public/index.html dist/public/404.html || true; fi
 
 # Production image, copy all files and run the app
 FROM base AS runner
