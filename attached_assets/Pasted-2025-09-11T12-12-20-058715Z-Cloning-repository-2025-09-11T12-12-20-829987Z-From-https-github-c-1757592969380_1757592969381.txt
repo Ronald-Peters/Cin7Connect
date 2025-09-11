@@ -1,0 +1,101 @@
+2025-09-11T12:12:20.058715Z	Cloning repository...
+2025-09-11T12:12:20.829987Z	From https://github.com/Ronald-Peters/Cin7Connect
+2025-09-11T12:12:20.830522Z	 * branch            dfbcd06d8e7dd195ecd081b7ef4f5022fabeb3f0 -> FETCH_HEAD
+2025-09-11T12:12:20.830633Z	
+2025-09-11T12:12:20.872279Z	HEAD is now at dfbcd06 Update build process to include frontend and backend compilation
+2025-09-11T12:12:20.872677Z	
+2025-09-11T12:12:20.953777Z	
+2025-09-11T12:12:20.954248Z	Using v2 root directory strategy
+2025-09-11T12:12:20.976048Z	Success: Finished cloning repository files
+2025-09-11T12:12:22.70776Z	Checking for configuration in a Wrangler configuration file (BETA)
+2025-09-11T12:12:22.708448Z	
+2025-09-11T12:12:22.709973Z	Found wrangler.toml file. Reading build configuration...
+2025-09-11T12:12:22.715708Z	pages_build_output_dir: dist
+2025-09-11T12:12:22.715925Z	Build environment variables: (none found)
+2025-09-11T12:12:23.818015Z	Successfully read wrangler.toml file.
+2025-09-11T12:12:23.885119Z	Detected the following tools from environment: npm@10.9.2, nodejs@22.16.0
+2025-09-11T12:12:23.885742Z	Installing project dependencies: npm clean-install --progress=false
+2025-09-11T12:12:26.777212Z	npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+2025-09-11T12:12:27.157443Z	npm warn deprecated npmlog@6.0.2: This package is no longer supported.
+2025-09-11T12:12:27.483295Z	npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+2025-09-11T12:12:27.874007Z	npm warn deprecated gauge@4.0.4: This package is no longer supported.
+2025-09-11T12:12:28.039915Z	npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+2025-09-11T12:12:28.079924Z	npm warn deprecated are-we-there-yet@3.0.1: This package is no longer supported.
+2025-09-11T12:12:28.609524Z	npm warn deprecated @npmcli/move-file@1.1.2: This functionality has been moved to @npmcli/fs
+2025-09-11T12:12:28.690365Z	npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+2025-09-11T12:12:28.712466Z	npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+2025-09-11T12:12:28.952805Z	npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+2025-09-11T12:12:28.973439Z	npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+2025-09-11T12:12:29.025623Z	npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+2025-09-11T12:12:34.037115Z	
+2025-09-11T12:12:34.037402Z	added 644 packages, and audited 645 packages in 10s
+2025-09-11T12:12:34.037584Z	
+2025-09-11T12:12:34.037716Z	79 packages are looking for funding
+2025-09-11T12:12:34.037859Z	  run `npm fund` for details
+2025-09-11T12:12:34.064711Z	
+2025-09-11T12:12:34.064935Z	10 vulnerabilities (3 low, 7 moderate)
+2025-09-11T12:12:34.065064Z	
+2025-09-11T12:12:34.06513Z	To address issues that do not require attention, run:
+2025-09-11T12:12:34.06524Z	  npm audit fix
+2025-09-11T12:12:34.065308Z	
+2025-09-11T12:12:34.065365Z	To address all issues (including breaking changes), run:
+2025-09-11T12:12:34.065448Z	  npm audit fix --force
+2025-09-11T12:12:34.065508Z	
+2025-09-11T12:12:34.065587Z	Run `npm audit` for details.
+2025-09-11T12:12:34.097334Z	Executing user command: npm ci && npm run build
+2025-09-11T12:12:41.845132Z	npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+2025-09-11T12:12:41.864465Z	npm warn deprecated @npmcli/move-file@1.1.2: This functionality has been moved to @npmcli/fs
+2025-09-11T12:12:41.895013Z	npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+2025-09-11T12:12:41.908161Z	npm warn deprecated npmlog@6.0.2: This package is no longer supported.
+2025-09-11T12:12:41.957731Z	npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+2025-09-11T12:12:42.004754Z	npm warn deprecated are-we-there-yet@3.0.1: This package is no longer supported.
+2025-09-11T12:12:42.008344Z	npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+2025-09-11T12:12:42.02433Z	npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+2025-09-11T12:12:42.024793Z	npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+2025-09-11T12:12:42.025955Z	npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+2025-09-11T12:12:42.226136Z	npm warn deprecated gauge@4.0.4: This package is no longer supported.
+2025-09-11T12:12:42.332951Z	npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+2025-09-11T12:12:44.962672Z	
+2025-09-11T12:12:44.962955Z	added 644 packages, and audited 645 packages in 11s
+2025-09-11T12:12:44.963126Z	
+2025-09-11T12:12:44.963258Z	79 packages are looking for funding
+2025-09-11T12:12:44.963341Z	  run `npm fund` for details
+2025-09-11T12:12:44.98954Z	
+2025-09-11T12:12:44.989795Z	10 vulnerabilities (3 low, 7 moderate)
+2025-09-11T12:12:44.98992Z	
+2025-09-11T12:12:44.990043Z	To address issues that do not require attention, run:
+2025-09-11T12:12:44.990119Z	  npm audit fix
+2025-09-11T12:12:44.990182Z	
+2025-09-11T12:12:44.990271Z	To address all issues (including breaking changes), run:
+2025-09-11T12:12:44.990355Z	  npm audit fix --force
+2025-09-11T12:12:44.990454Z	
+2025-09-11T12:12:44.99057Z	Run `npm audit` for details.
+2025-09-11T12:12:45.390485Z	
+2025-09-11T12:12:45.390735Z	> rest-express@1.0.0 build
+2025-09-11T12:12:45.390872Z	> npm run build:client && npm run copy:client && npm run build:server && (cp -r attached_assets dist/ || true)
+2025-09-11T12:12:45.391008Z	
+2025-09-11T12:12:45.565124Z	
+2025-09-11T12:12:45.565375Z	> rest-express@1.0.0 build:client
+2025-09-11T12:12:45.56553Z	> vite build --base=/ --outDir client/dist --emptyOutDir
+2025-09-11T12:12:45.565675Z	
+2025-09-11T12:12:45.823723Z	[36mvite v5.4.19 [32mbuilding for production...[36m[39m
+2025-09-11T12:12:45.874108Z	transforming...
+2025-09-11T12:12:46.180016Z	Browserslist: browsers data (caniuse-lite) is 11 months old. Please run:
+2025-09-11T12:12:46.180322Z	  npx update-browserslist-db@latest
+2025-09-11T12:12:46.180471Z	  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2025-09-11T12:12:49.038229Z	[32m✓[39m 1724 modules transformed.
+2025-09-11T12:12:49.263037Z	rendering chunks...
+2025-09-11T12:12:49.271218Z	computing gzip size...
+2025-09-11T12:12:49.284033Z	[2mclient/dist/[22m[32mindex.html                        [39m[1m[2m  1.30 kB[22m[1m[22m[2m │ gzip:   0.59 kB[22m
+2025-09-11T12:12:49.284447Z	[2mclient/dist/[22m[2massets/[22m[32mreivilo-logo-BySka23f.jpg  [39m[1m[2m 13.75 kB[22m[1m[22m
+2025-09-11T12:12:49.284602Z	[2mclient/dist/[22m[2massets/[22m[35mindex-Q0remh_-.css         [39m[1m[2m 63.17 kB[22m[1m[22m[2m │ gzip:  11.28 kB[22m
+2025-09-11T12:12:49.284737Z	[2mclient/dist/[22m[2massets/[22m[36mindex-C-tbhnVZ.js          [39m[1m[2m374.57 kB[22m[1m[22m[2m │ gzip: 115.11 kB[22m
+2025-09-11T12:12:49.284858Z	[32m✓ built in 3.44s[39m
+2025-09-11T12:12:49.498834Z	
+2025-09-11T12:12:49.499202Z	> rest-express@1.0.0 copy:client
+2025-09-11T12:12:49.499319Z	> rm -rf dist && mkdir -p dist && cp -r client/dist/* dist/
+2025-09-11T12:12:49.499498Z	
+2025-09-11T12:12:49.513584Z	cp: cannot stat 'client/dist/*': No such file or directory
+2025-09-11T12:12:49.531051Z	Failed: Error while executing user command. Exited with error code: 1
+2025-09-11T12:12:49.541376Z	Failed: build command exited with code: 1
+2025-09-11T12:12:50.959733Z	Failed: error occurred while running build command
