@@ -22,9 +22,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Simple session (cookie-based)
+// Ensure secure session secret
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET environment variable is required for production");
+}
+
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "reivilo-b2b-dev-secret",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -42,12 +47,16 @@ type User = { id: string; email: string; role: "admin" | "user"; name?: string }
 function authenticate(email?: string, password?: string): User | null {
   if (!email || !password) return null;
 
-  // Env overrides; falls back to your provided admin user
-  const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "ronald@reiviloindustrial.co.za").toLowerCase();
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Ron@Reiv25";
+  // Require admin credentials via environment variables only
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+  
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required");
+  }
 
-  if (email.toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-    return { id: "admin-1", email: ADMIN_EMAIL, role: "admin", name: "Admin" };
+  if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD) {
+    return { id: "admin-1", email: ADMIN_EMAIL.toLowerCase(), role: "admin", name: "Admin" };
   }
   return null;
 }
@@ -360,10 +369,15 @@ app.post("/api/checkout", requireAuth, async (req, res) => {
 // ---------- Static assets ----------
 app.use("/attached_assets", express.static(path.resolve(__dirname, "../attached_assets")));
 
+// Fixed path resolution for Cloud Run deployment
 const publicPath =
   process.env.NODE_ENV === "production"
-    ? path.resolve(__dirname, "./public")
+    ? path.resolve(__dirname, "./public")  // Correct: server/public directory
     : path.resolve(__dirname, "../dist/public");
+
+log(`🔍 Looking for static files at: ${publicPath}`);
+log(`🔍 Current working directory: ${process.cwd()}`);
+log(`🔍 __dirname: ${__dirname}`);
 
 // Serve all static files from the public directory
 app.use(express.static(publicPath));
@@ -381,13 +395,38 @@ app.get("/catalog", requireAuth, async (_req, res) => {
 function sendSpa(req: Request, res: Response) {
   const indexHtml =
     process.env.NODE_ENV === "production"
-      ? path.resolve(__dirname, "./public/index.html")
+      ? path.resolve(__dirname, "./public/index.html")  // Correct: server/public/index.html
       : path.resolve(__dirname, "../dist/public/index.html");
-  res.sendFile(indexHtml, (err) => {
-    if (err) {
-      log(`❌ Error serving SPA: ${err.message}`);
-      res.status(500).send("App failed to load");
+  
+  log(`🔍 Attempting to serve SPA from: ${indexHtml}`);
+  
+  // Check if file exists first
+  import('fs').then(fs => {
+    if (!fs.existsSync(indexHtml)) {
+      log(`❌ SPA file not found at: ${indexHtml}`);
+      log(`📂 Available files in directory:`);
+      try {
+        const dir = path.dirname(indexHtml);
+        const files = fs.readdirSync(dir);
+        files.forEach(file => log(`  - ${file}`));
+      } catch (e: any) {
+        log(`❌ Cannot read directory: ${e.message || e}`);
+      }
+      return res.status(500).send("App failed to load - index.html not found");
     }
+    
+    res.sendFile(indexHtml, (err) => {
+      if (err) {
+        log(`❌ Error serving SPA: ${err.message}`);
+        log(`📂 File exists but failed to serve from: ${indexHtml}`);
+        res.status(500).send("App failed to load - serve error");
+      } else {
+        log(`✅ Successfully served SPA from: ${indexHtml}`);
+      }
+    });
+  }).catch((e: any) => {
+    log(`❌ Import error: ${e.message || e}`);
+    res.status(500).send("App failed to load - import error");
   });
 }
 
@@ -407,6 +446,19 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 // ---------- Start ----------
 const PORT = Number(process.env.PORT || 8080);
 const HOST = "0.0.0.0";
-app.listen(PORT, HOST, () => {
-  console.log(`🚀 API listening on http://${HOST}:${PORT}`);
-});
+
+// Add startup logging
+log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+log(`📂 Working directory: ${process.cwd()}`);
+log(`📂 __dirname: ${__dirname}`);
+
+// Start server with error handling
+try {
+  app.listen(PORT, HOST, () => {
+    log(`🚀 Reivilo B2B Portal listening on http://${HOST}:${PORT}`);
+    log(`✅ Server started successfully in ${process.env.NODE_ENV || 'development'} mode`);
+  });
+} catch (error: any) {
+  log(`❌ Failed to start server: ${error.message || error}`);
+  process.exit(1);
+}
