@@ -18,10 +18,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build application (frontend and backend)
-RUN npx vite build --base=/
-RUN npm run build:server
-RUN if [ -d "attached_assets" ]; then cp -r attached_assets dist/ || true; fi
+# Build application using our fixed build script
+COPY build.sh ./
+RUN chmod +x build.sh && ./build.sh
 
 # Production image, copy all files and run the app
 FROM base AS runner
@@ -35,9 +34,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy built application
-COPY --from=builder /app/dist/index.js ./dist/index.js
-COPY --from=builder /app/dist/public ./dist/public
-COPY --from=builder /app/server ./server
+COPY --from=builder /app/dist ./dist
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 

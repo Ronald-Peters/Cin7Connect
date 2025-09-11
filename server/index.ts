@@ -82,7 +82,7 @@ import { cin7Service } from "./services/cin7";
 
 // ---------- Health / connectivity ----------
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
-app.get("/healthz", (_req, res) => res.send("OK"));
+app.get("/healthz", (_req, res) => res.status(200).json({ status: "ok", timestamp: new Date().toISOString() }));
 
 app.get("/api/test-connection", async (_req, res) => {
   try {
