@@ -149,25 +149,18 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // Get pricing data (this works!)
-      const allProducts = await cin7Service.getProducts({ page: 1, limit: 1000 });
-      
-      // Create pricing map
-      const pricingMap = new Map();
-      if (Array.isArray(allProducts)) {
-        allProducts.forEach((product: any) => {
-          if (product.SKU) {
-            pricingMap.set(product.SKU, {
-              price: parseFloat(product.DefaultSellPrice || '0'),
-              name: product.Name,
-              category: product.Category,
-              description: product.Description,
-              barcode: product.Barcode,
-              brand: product.Brand
-            });
-          }
-        });
-      }
+      // Create product map from availability data (which works!)
+      const productMap = new Map();
+      allAvailability.forEach((item: any) => {
+        if (item.SKU) {
+          productMap.set(item.SKU, {
+            name: item.Name || item.SKU,
+            sku: item.SKU,
+            brand: '', // Not available in availability data
+            barcode: '', // Not available in availability data
+          });
+        }
+      });
       
       // Get unique SKUs from availability data
       const uniqueSkus = Array.from(new Set(allAvailability.map(item => item.SKU).filter(Boolean)));
@@ -179,13 +172,13 @@ export class DatabaseStorage implements IStorage {
       
       for (const sku of uniqueSkus) {
         try {
-          const pricing = pricingMap.get(sku);
+          const product = productMap.get(sku);
           
           await this.upsertProduct({
             sku: sku,
-            name: pricing?.name || sku,
-            barcode: pricing?.barcode,
-            brand: pricing?.brand,
+            name: product?.name || sku,
+            barcode: product?.barcode || '',
+            brand: product?.brand || '',
             imageUrl: null,
           });
           synced++;

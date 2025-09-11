@@ -313,6 +313,75 @@ export function registerRoutes(app: Express): Server {
   });
 
   // -------------------------
+  // Scheduler Monitoring & Control (Admin Only)
+  // -------------------------
+  
+  // Get scheduler status and statistics
+  app.get("/api/scheduler/status", requireAdmin, async (_req, res) => {
+    try {
+      const { syncScheduler } = await import('./scheduler');
+      
+      const status = {
+        isRunning: syncScheduler.isSchedulerRunning(),
+        health: syncScheduler.getHealthStatus(),
+        stats: syncScheduler.getStats(),
+        timestamp: new Date().toISOString()
+      };
+      
+      res.json(status);
+    } catch (error: any) {
+      console.error("Error getting scheduler status:", error);
+      res.status(500).json({ message: "Failed to get scheduler status" });
+    }
+  });
+
+  // Manual sync triggers
+  app.post("/api/scheduler/trigger/:type", requireAdmin, async (req: any, res) => {
+    try {
+      const { type } = req.params;
+      const allowedTypes = ['customers', 'products', 'availability', 'all'];
+      
+      if (!allowedTypes.includes(type)) {
+        return res.status(400).json({ 
+          message: `Invalid sync type. Must be one of: ${allowedTypes.join(', ')}` 
+        });
+      }
+
+      const { syncScheduler } = await import('./scheduler');
+      const result = await syncScheduler.triggerSync(type);
+      
+      res.json({ 
+        success: true, 
+        message: `Manual ${type} sync triggered successfully`,
+        result 
+      });
+    } catch (error: any) {
+      console.error("Error triggering manual sync:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to trigger sync", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Scheduler health check
+  app.get("/api/scheduler/health", requireAdmin, async (_req, res) => {
+    try {
+      const { syncScheduler } = await import('./scheduler');
+      const health = syncScheduler.getHealthStatus();
+      
+      res.json({
+        ...health,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error("Error getting scheduler health:", error);
+      res.status(500).json({ message: "Failed to get scheduler health" });
+    }
+  });
+
+  // -------------------------
   // Manual product sync (optional – keeps your old DB sync utility)
   // -------------------------
   app.post("/api/products/sync", async (_req, res) => {

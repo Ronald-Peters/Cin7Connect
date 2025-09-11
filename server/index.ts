@@ -73,60 +73,12 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 // ---------- Import Routes ----------
 import { registerRoutes } from "./routes";
 
-// ---------- Core (Cin7) ----------
-const CORE_BASE_URL =
-  process.env.CIN7_BASE_URL || process.env.CORE_BASE_URL || "https://inventory.dearsystems.com/ExternalApi/v2";
+// ---------- Import Scheduler ----------
+// Auto-starts the sync scheduler for Cin7 data synchronization
+import { syncScheduler } from "./scheduler";
 
-const CORE_HEADERS = () => ({
-  "Content-Type": "application/json",
-  "Accept": "application/json",
-  "api-auth-accountid": process.env.CIN7_ACCOUNT_ID || "",
-  "api-auth-applicationkey": process.env.CIN7_APP_KEY || "",
-});
-
-async function coreGet(
-  apiPath: string,
-  {
-    page,
-    limit,
-    qs = {},
-  }: { page?: number; limit?: number; qs?: Record<string, any> } = {}
-) {
-  const url = new URL(`${CORE_BASE_URL}${apiPath}`);
-  if (page) url.searchParams.set("Page", String(page));
-  if (limit) url.searchParams.set("Limit", String(limit));
-  for (const [k, v] of Object.entries(qs))
-    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
-
-  const res = await fetch(url.toString(), { headers: CORE_HEADERS() });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Core GET ${url} failed (${res.status}): ${text}`);
-  }
-  
-  // Check for HTML response (indicates wrong endpoint/auth)
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    throw new Error(`Non-JSON response from Cin7 Core – check base URL (/v2) and credentials. Got: ${contentType}`);
-  }
-  
-  return res.json();
-}
-
-async function corePost(apiPath: string, body: any) {
-  const url = `${CORE_BASE_URL}${apiPath}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: CORE_HEADERS(),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Core POST ${url} failed (${res.status}): ${text}`);
-  }
-  return res.json();
-}
+// ---------- Import Cin7 Service ----------
+import { cin7Service } from "./services/cin7";
 
 // ---------- Health / connectivity ----------
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
@@ -134,9 +86,11 @@ app.get("/healthz", (_req, res) => res.send("OK"));
 
 app.get("/api/test-connection", async (_req, res) => {
   try {
-    const result = await coreGet("/Ref/Warehouse", { page: 1, limit: 1 });
-    res.json({ success: true, connected: true, result });
+    const connected = await cin7Service.testConnection();
+    const warehouses = await cin7Service.getLocations();
+    res.json({ success: true, connected, warehouses: warehouses.slice(0, 3) });
   } catch (error: any) {
+    log(`❌ Test connection failed: ${error.message}`);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -180,11 +134,8 @@ app.get("/api/products", async (req, res) => {
     let all: any[] = [];
     let page = 1;
     for (;;) {
-      const pageData = (await coreGet("/ProductAvailability", {
-        page,
-        limit: 1000,
-      })) as any;
-      const rows = pageData.ProductAvailability || [];
+      const response = await cin7Service.getProductAvailability("", page, 1000);
+      const rows = response.data || [];
       all = all.concat(rows);
       if (rows.length < 1000) break;
       page += 1;
@@ -279,9 +230,9 @@ app.get("/api/availability", async (req, res) => {
     let all: any[] = [];
     let page = 1;
     for (;;) {
-      const pageData = (await coreGet("/ProductAvailability", {
-        page,
-        limit: sku ? 50 : 1000,
+      const pageData = (await corePost("ProductAvailability", {
+        Page: page,
+        Limit: sku ? 50 : 1000,
       })) as any;
       const rows = pageData.ProductAvailability || [];
       all = all.concat(rows);
@@ -349,7 +300,7 @@ app.post("/api/checkout", requireAuth, async (req, res) => {
       })),
     };
 
-    const result = await corePost("/Sale", payload);
+    const result = await cin7Service.createQuote(payload);
     res.json({
       success: true,
       message: "Created NOTAUTHORISED quote in Cin7",
