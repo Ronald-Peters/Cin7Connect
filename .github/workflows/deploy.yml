@@ -26,7 +26,8 @@ jobs:
         run: npm run check --if-present
 
       - name: Build Frontend
-        run: vite build --base=/
+        run: npx vite build --base=/
+        working-directory: ./
 
       - name: Build Backend
         run: npm run build:server
