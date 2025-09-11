@@ -67,32 +67,19 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   return res.status(401).json({ message: "Authentication required" });
 }
 
-app.post("/api/login", (req, res) => {
-  const { email, password } = req.body || {};
-  const user = authenticate(email, password);
-  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+// Note: Auth routes are now handled in routes.ts via registerRoutes()
+// Removed duplicate login/logout/auth endpoints to avoid conflicts
 
-  (req.session as any).user = user;
-  res.json({ ok: true, user });
-});
-
-app.post("/api/logout", (req, res) => {
-  req.session?.destroy(() => {});
-  res.json({ ok: true });
-});
-
-app.get("/api/auth/me", (req, res) => {
-  const user = (req.session as any)?.user as User | undefined;
-  if (!user) return res.status(401).json({ message: "Not authenticated" });
-  res.json(user);
-});
+// ---------- Import Routes ----------
+import { registerRoutes } from "./routes";
 
 // ---------- Core (Cin7) ----------
 const CORE_BASE_URL =
-  process.env.CORE_BASE_URL || "https://inventory.dearsystems.com/ExternalApi";
+  process.env.CIN7_BASE_URL || process.env.CORE_BASE_URL || "https://inventory.dearsystems.com/ExternalApi/v2";
 
 const CORE_HEADERS = () => ({
   "Content-Type": "application/json",
+  "Accept": "application/json",
   "api-auth-accountid": process.env.CIN7_ACCOUNT_ID || "",
   "api-auth-applicationkey": process.env.CIN7_APP_KEY || "",
 });
@@ -106,8 +93,8 @@ async function coreGet(
   }: { page?: number; limit?: number; qs?: Record<string, any> } = {}
 ) {
   const url = new URL(`${CORE_BASE_URL}${apiPath}`);
-  if (page) url.searchParams.set("page", String(page));
-  if (limit) url.searchParams.set("limit", String(limit));
+  if (page) url.searchParams.set("Page", String(page));
+  if (limit) url.searchParams.set("Limit", String(limit));
   for (const [k, v] of Object.entries(qs))
     if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
 
@@ -116,6 +103,14 @@ async function coreGet(
     const text = await res.text();
     throw new Error(`Core GET ${url} failed (${res.status}): ${text}`);
   }
+  
+  // Check for HTML response (indicates wrong endpoint/auth)
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    throw new Error(`Non-JSON response from Cin7 Core – check base URL (/v2) and credentials. Got: ${contentType}`);
+  }
+  
   return res.json();
 }
 
@@ -139,7 +134,7 @@ app.get("/healthz", (_req, res) => res.send("OK"));
 
 app.get("/api/test-connection", async (_req, res) => {
   try {
-    const result = await coreGet("/Locations", { page: 1, limit: 1 });
+    const result = await coreGet("/Ref/Warehouse", { page: 1, limit: 1 });
     res.json({ success: true, connected: true, result });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -435,7 +430,10 @@ app.get("/", sendSpa);
 // And let these routes also load the SPA so the React router can handle them
 app.get(["/auth", "/login", "/admin", "/app", "/catalog/*", "/profile", "/cart"], sendSpa);
 
-// ---------- Error handler ----------
+// ---------- Setup Routes ----------
+registerRoutes(app);
+
+// ---------- Error handler (MUST be after all routes) ----------
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";

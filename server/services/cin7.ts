@@ -170,9 +170,22 @@ export class Cin7Service {
     const params: any = { Page: page, Limit: limit };
     if (search) params.Search = search;
 
-    const resp = await this.client.get("/Ref/Product", { params });
-    const raw = (resp.data as any[]) || [];
+    const resp = await this.client.get("/Product", { params });
+    console.log("Cin7 Products API Response:", JSON.stringify(resp.data, null, 2));
+    
+    // Handle different response formats from Cin7 API
+    let raw: any[] = [];
+    if (Array.isArray(resp.data)) {
+      raw = resp.data;
+    } else if (resp.data && Array.isArray(resp.data.Products)) {
+      raw = resp.data.Products;
+    } else if (resp.data && typeof resp.data === 'object') {
+      // If it's an object, try to extract array from common property names
+      raw = resp.data.data || resp.data.items || resp.data.results || [];
+    }
 
+    console.log(`Processing ${raw.length} products from Cin7`);
+    
     return raw.map((p: any) => ({
       SKU: p?.SKU ?? p?.Sku ?? "",
       Name: p?.Name,
@@ -209,7 +222,7 @@ export class Cin7Service {
     page = 1,
     limit = 500
   ): Promise<{ data: Cin7Customer[]; pagination: any }> {
-    const resp = await this.client.get("/Customers", {
+    const resp = await this.client.get("/Customer", {
       params: { Page: page, Limit: Math.min(limit, 500) },
     });
     return {

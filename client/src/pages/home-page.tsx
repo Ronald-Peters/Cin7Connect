@@ -7,22 +7,22 @@ export default function HomePage() {
   const [, setLocation] = useLocation();
 
   return (
-    <div className="min-h-screen bg-white" data-testid="home-page">
+    <div className="min-h-screen bg-gradient-to-br from-[#1E3A8A] via-[#1E40AF] to-[#DBEAFE]" data-testid="home-page" style={{fontFamily: 'Segoe UI, system-ui, sans-serif'}}>
       <Header />
       
       {/* Hero Section */}
-      <section className="bg-white">
+      <section className="bg-transparent">
         <div className="max-w-6xl mx-auto px-6 py-16">
           <div className="flex flex-col lg:flex-row items-center gap-12">
             {/* Left Content */}
             <div className="flex-1 lg:pr-8">
-              <div className="mb-8">
+              <div className="mb-8 bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-2xl">
                 <img 
                   src={reiviloLogo} 
                   alt="Reivilo Industrial" 
                   className="h-24 w-auto mb-6"
                 />
-                <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+                <h1 className="text-4xl lg:text-5xl font-bold text-[#1E3A8A] mb-6 leading-tight">
                   Reivilo Industrial Ltd
                 </h1>
                 <h2 className="text-xl lg:text-2xl text-[#1e3a8a] font-semibold mb-4">
@@ -58,7 +58,7 @@ export default function HomePage() {
 
             {/* Right Content - Company Stats */}
             <div className="flex-1 lg:pl-8">
-              <div className="bg-gray-50 rounded-lg p-8">
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-2xl">
                 <h3 className="text-xl font-semibold text-gray-900 mb-6">Company Overview</h3>
                 <div className="space-y-6">
                   <div className="flex justify-between items-center">
@@ -85,36 +85,36 @@ export default function HomePage() {
       </section>
 
       {/* Services Section */}
-      <section className="bg-gray-50 py-16">
+      <section className="bg-white/10 backdrop-blur-sm py-16">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Services</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold text-white mb-4">Our Services</h2>
+            <p className="text-lg text-white/90 max-w-2xl mx-auto">
               Comprehensive industrial supply solutions with real-time inventory management 
               and efficient distribution across South Africa.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white rounded-lg p-8 shadow-sm">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Industrial Supplies</h3>
-              <p className="text-gray-600">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-2xl">
+              <h3 className="text-xl font-semibold text-[#1E3A8A] mb-4">Industrial Supplies</h3>
+              <p className="text-gray-700">
                 Comprehensive range of industrial products with real-time stock visibility 
                 across all our warehouse locations.
               </p>
             </div>
 
-            <div className="bg-white rounded-lg p-8 shadow-sm">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Multi-Location Service</h3>
-              <p className="text-gray-600">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-2xl">
+              <h3 className="text-xl font-semibold text-[#1E3A8A] mb-4">Multi-Location Service</h3>
+              <p className="text-gray-700">
                 Strategic warehouse locations in Johannesburg, Cape Town, and Bloemfontein 
                 for rapid nationwide distribution.
               </p>
             </div>
 
-            <div className="bg-white rounded-lg p-8 shadow-sm">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Customer Portal</h3>
-              <p className="text-gray-600">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-2xl">
+              <h3 className="text-xl font-semibold text-[#1E3A8A] mb-4">Customer Portal</h3>
+              <p className="text-gray-700">
                 Dedicated B2B portal with customer-specific pricing, order tracking, 
                 and seamless procurement processes.
               </p>
