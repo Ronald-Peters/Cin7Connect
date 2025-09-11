@@ -25,8 +25,18 @@ jobs:
       - name: Typecheck (optional)
         run: npm run check --if-present
 
-      - name: Build (optional)
-        run: npm run build --if-present
+      - name: Build Frontend
+        run: vite build --base=/
+
+      - name: Build Backend
+        run: npm run build:server
+
+      - name: Copy Assets
+        run: |
+          # Copy attached assets if they exist
+          if [ -d "attached_assets" ]; then
+            cp -r attached_assets dist/ || true
+          fi
 
   deploy:
     needs: test
