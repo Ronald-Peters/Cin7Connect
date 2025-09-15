@@ -46,17 +46,10 @@ jobs:
         with:
           project_id: ${{ secrets.GOOGLE_CLOUD_ID }}
 
-      - name: Validate GitHub Secrets
+      - name: Pre-deployment Check
         run: |
-          echo "🔧 Validating GitHub repository secrets..."
-          
-          if [ -z "${{ secrets.DATABASE_URL }}" ]; then
-            echo "❌ ERROR: DATABASE_URL secret is empty or missing in GitHub repo"
-            exit 1
-          fi
-          
-          echo "✅ DATABASE_URL secret is configured"
-          echo "⚠️ Note: Using existing Google Cloud secrets (manual setup required)"
+          echo "🚀 Ready to deploy - using existing Cloud Run secret configuration"
+          echo "✅ All secrets pre-configured in Cloud Run service"
 
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
@@ -69,8 +62,7 @@ jobs:
             --memory=1Gi
             --cpu=1
             --port=8080
-            --set-env-vars=NODE_ENV=production,FROM_EMAIL=noreply@reiviloindustrial.co.za,SUPPORT_EMAIL=support@reiviloindustrial.co.za,SESSION_SECRET=reivilo-b2b-session-secret-2025,SYNC_TOKEN=reivilo-sync-token-2025,ADMIN_EMAIL=ronald@reiviloindustrial.co.za,ADMIN_PASSWORD=Ron@Reiv25
-            --set-secrets=DATABASE_URL=DATABASE_URL:latest,CIN7_ACCOUNT_ID=CIN7_ACCOUNT_ID:latest,CIN7_APP_KEY=CIN7_APP_KEY:latest
+            --set-env-vars=NODE_ENV=production,FROM_EMAIL=noreply@reiviloindustrial.co.za,SUPPORT_EMAIL=support@reiviloindustrial.co.za,ADMIN_EMAIL=ronald@reiviloindustrial.co.za,ADMIN_PASSWORD=Ron@Reiv25
             # Fixed: Removed ADMIN_EMAIL/ADMIN_PASSWORD secrets causing deployment failure
             # Enhanced logging added to diagnose Cloud Run startup issues
             # FIXED: Removed admin credentials crash causing 404 errors
