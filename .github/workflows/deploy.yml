@@ -61,3 +61,4 @@ jobs:
             --set-secrets=DATABASE_URL=DATABASE_URL:latest,CIN7_ACCOUNT_ID=CIN7_ACCOUNT_ID:latest,CIN7_APP_KEY=CIN7_APP_KEY:latest
             # Fixed: Removed ADMIN_EMAIL/ADMIN_PASSWORD secrets causing deployment failure
             # Enhanced logging added to diagnose Cloud Run startup issues
+            # FIXED: Removed admin credentials crash causing 404 errors

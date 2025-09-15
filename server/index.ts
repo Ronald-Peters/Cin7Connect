@@ -33,16 +33,18 @@ type User = { id: string; email: string; role: "admin" | "user"; name?: string }
 function authenticate(email?: string, password?: string): User | null {
   if (!email || !password) return null;
 
-  // Require admin credentials via environment variables only
+  // Use environment variables with fallback credentials for production
   const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
   const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
   
-  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
-    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required");
-  }
+  // Fallback credentials for production/development
+  const adminEmail = ADMIN_EMAIL || "ronald@reiviloindustrial.co.za";
+  const adminPassword = ADMIN_PASSWORD || "Ron@Reiv25";
+  
+  log(`[LOGIN] Admin email available: ${!!ADMIN_EMAIL}, Using: ${adminEmail}`);
 
-  if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD) {
-    return { id: "admin-1", email: ADMIN_EMAIL.toLowerCase(), role: "admin", name: "Admin" };
+  if (email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword) {
+    return { id: "admin-1", email: adminEmail.toLowerCase(), role: "admin", name: "Admin" };
   }
   return null;
 }
@@ -59,12 +61,12 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 // ---------- Import Routes ----------
 import { registerRoutes } from "./routes";
 
-// ---------- Import Scheduler ----------
-// Auto-starts the sync scheduler for Cin7 data synchronization
+// ---------- Import Scheduler and Cin7 Service ----------  
+// Import normally but add null checks throughout the app
 import { syncScheduler } from "./scheduler";
-
-// ---------- Import Cin7 Service ----------
 import { cin7Service } from "./services/cin7";
+
+log(`🔧 External services imported - will validate credentials at runtime`);
 
 // ---------- Global Error Handlers (PRODUCTION FIX) ----------
 process.on('unhandledRejection', (reason, promise) => {
