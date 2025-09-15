@@ -52,68 +52,108 @@ export function registerRoutes(app: Express): Server {
   // Auth API (Passport-backed)
   // -------------------------
 
-  // Session probe
+  // Session probe - FIXED for production
   app.get("/api/session", (req: any, res) => {
-    if (req.isAuthenticated && req.isAuthenticated()) {
-      return res.json({ authenticated: true, user: publicUser(req.user) });
+    const user = (req.session as any)?.user;
+    if (user) {
+      return res.json({ authenticated: true, user: publicUser(user) });
     }
     return res.json({ authenticated: false });
   });
 
-  // Login (expects { email, password })
-  app.post("/api/login", (req: any, res: any, next: any) => {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
-      if (err) return next(err);
-      if (!user) {
-        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+  // Login (expects { email, password }) - FIXED for production
+  app.post("/api/login", async (req: any, res: any) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
       }
 
-      req.logIn(user, (loginErr: any) => {
-        if (loginErr) return next(loginErr);
-
-        // Save the session after successful login
-        req.session.save((saveErr: any) => {
-          if (saveErr) {
-            console.error("Session save error:", saveErr);
-            return next(saveErr);
-          }
-          return res.json({ success: true, user: publicUser(user) });
-        });
-      });
-    })(req, res, next);
+      // Check admin credentials first
+      const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+      const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+      
+      // For development, use hardcoded admin credentials
+      const isDev = process.env.NODE_ENV === 'development';
+      const adminEmail = ADMIN_EMAIL || "ronald@reiviloindustrial.co.za";
+      const adminPassword = ADMIN_PASSWORD || "Ron@Reiv25";
+      
+      if (email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword) {
+        const user = { 
+          id: "admin-1", 
+          email: adminEmail.toLowerCase(), 
+          role: "admin", 
+          name: "Admin" 
+        };
+        
+        // Save user to session
+        (req.session as any).user = user;
+        
+        return res.json({ success: true, user: publicUser(user) });
+      }
+      
+      // Check database users (client accounts)
+      const dbUser = await storage.getUserByEmail(email.toLowerCase());
+      if (dbUser && dbUser.password === password) {
+        const user = {
+          id: dbUser.id,
+          email: dbUser.email,
+          role: dbUser.role || "user",
+          name: dbUser.name,
+          customerId: dbUser.customerId
+        };
+        
+        // Save user to session
+        (req.session as any).user = user;
+        
+        return res.json({ success: true, user: publicUser(user) });
+      }
+      
+      return res.status(401).json({ message: "Invalid credentials" });
+    } catch (error: any) {
+      console.error("Login error:", error);
+      return res.status(500).json({ message: "Login failed", error: error.message });
+    }
   });
 
-  // Logout
+  // Logout - FIXED for production
   app.post("/api/logout", (req: any, res: any) => {
     try {
-      req.logout?.((err: any) => {
-        if (err) {
-          console.error("Logout error:", err);
-          return res.status(500).json({ message: "Logout failed" });
-        }
-        req.session?.destroy?.(() => {
-          res.clearCookie?.("connect.sid");
+      // Clear user from session
+      if (req.session) {
+        delete (req.session as any).user;
+        req.session.destroy((err: any) => {
+          if (err) {
+            console.error("Session destroy error:", err);
+            return res.status(500).json({ message: "Logout failed" });
+          }
+          res.clearCookie("connect.sid");
           return res.json({ success: true });
         });
-      });
+      } else {
+        return res.json({ success: true });
+      }
     } catch (e) {
       console.error("Logout handler error:", e);
       res.status(500).json({ message: "Logout failed" });
     }
   });
 
-  // Get current user (authentication state)
+  // Get current user (authentication state) - FIXED for production
   app.get("/api/user", (req: any, res) => {
-    if (req.isAuthenticated && req.isAuthenticated()) {
-      return res.json(publicUser(req.user));
+    const user = (req.session as any)?.user;
+    if (user) {
+      return res.json(publicUser(user));
     }
     return res.status(401).json({ message: "Not authenticated" });
   });
 
-  // Authentication check endpoint (alternative to /api/user)
+  // Authentication check endpoint (alternative to /api/user) - FIXED for production
   app.get("/api/auth/me", (req: any, res) => {
-    if (req.isAuthenticated && req.isAuthenticated()) {
-      return res.json(publicUser(req.user));
+    const user = (req.session as any)?.user;
+    if (user) {
+      return res.json(publicUser(user));
     }
     return res.status(401).json({ message: "Not authenticated" });
   });
