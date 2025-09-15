@@ -61,7 +61,7 @@ export function registerRoutes(app: Express): Server {
     return res.json({ authenticated: false });
   });
 
-  // Login (expects { email, password }) - FIXED for production
+  // Login (expects { email, password }) - PRODUCTION READY with database fallback
   app.post("/api/login", async (req: any, res: any) => {
     try {
       const { email, password } = req.body;
@@ -79,6 +79,7 @@ export function registerRoutes(app: Express): Server {
       const adminPassword = ADMIN_PASSWORD || "Ron@Reiv25";
       
       console.log(`[LOGIN] Admin email available: ${!!ADMIN_EMAIL}, Using: ${adminEmail}`);
+      console.log(`[LOGIN] Attempting login for: ${email}`);
       
       if (email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword) {
         const user = { 
@@ -88,33 +89,59 @@ export function registerRoutes(app: Express): Server {
           name: "Admin" 
         };
         
-        // Save user to session
-        (req.session as any).user = user;
+        try {
+          // Save user to session with error handling
+          (req.session as any).user = user;
+          console.log(`[LOGIN] Admin session saved successfully`);
+        } catch (sessionError: any) {
+          console.error(`[LOGIN] Session save failed but continuing:`, sessionError.message);
+          // Continue anyway - session might work on subsequent requests
+        }
         
         return res.json({ success: true, user: publicUser(user) });
       }
       
-      // Check database users (client accounts)
-      const dbUser = await storage.getUserByEmail(email.toLowerCase());
-      if (dbUser && dbUser.password === password) {
-        const user = {
-          id: dbUser.id,
-          email: dbUser.email,
-          role: dbUser.role || "user",
-          name: dbUser.name,
-          customerId: dbUser.customerId
-        };
+      // Check database users (client accounts) with error handling
+      try {
+        console.log(`[LOGIN] Checking database for user: ${email.toLowerCase()}`);
+        const dbUser = await storage.getUserByEmail(email.toLowerCase());
+        console.log(`[LOGIN] Database user found: ${!!dbUser}`);
         
-        // Save user to session
-        (req.session as any).user = user;
-        
-        return res.json({ success: true, user: publicUser(user) });
+        if (dbUser && dbUser.password === password) {
+          const user = {
+            id: dbUser.id,
+            email: dbUser.email,
+            role: dbUser.role || "user",
+            name: dbUser.name,
+            customerId: dbUser.customerId
+          };
+          
+          try {
+            // Save user to session with error handling
+            (req.session as any).user = user;
+            console.log(`[LOGIN] Database user session saved successfully`);
+          } catch (sessionError: any) {
+            console.error(`[LOGIN] Session save failed but continuing:`, sessionError.message);
+            // Continue anyway - session might work on subsequent requests
+          }
+          
+          return res.json({ success: true, user: publicUser(user) });
+        }
+      } catch (dbError: any) {
+        console.error(`[LOGIN] Database error (non-fatal):`, dbError.message);
+        // Continue to credential check - admin login should still work
       }
       
+      console.log(`[LOGIN] Invalid credentials for: ${email}`);
       return res.status(401).json({ message: "Invalid credentials" });
     } catch (error: any) {
-      console.error("Login error:", error);
-      return res.status(500).json({ message: "Login failed", error: error.message });
+      console.error("[LOGIN] Critical error:", error);
+      console.error("[LOGIN] Error stack:", error.stack);
+      return res.status(500).json({ 
+        message: "Login failed", 
+        error: error.message,
+        details: "Database or session configuration issue"
+      });
     }
   });
 

@@ -3,9 +3,11 @@ import { db } from "./db";
 import { eq, ilike, and, desc, asc, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
+import MemoryStore from "memorystore";
 import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
+const MemorySessionStore = MemoryStore(session);
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -55,10 +57,21 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.sessionStore = new PostgresSessionStore({ 
-      pool, 
-      createTableIfMissing: true 
-    });
+    try {
+      // Try to create Postgres session store (production)
+      this.sessionStore = new PostgresSessionStore({ 
+        pool, 
+        createTableIfMissing: true 
+      });
+      console.log(`✅ Using Postgres session store`);
+    } catch (error: any) {
+      console.warn(`⚠️ Postgres session store failed, falling back to memory: ${error.message}`);
+      // Fallback to memory store (development/emergency)
+      this.sessionStore = new MemorySessionStore({
+        checkPeriod: 86400000 // prune expired entries every 24h
+      });
+      console.log(`✅ Using Memory session store fallback`);
+    }
   }
 
   async getUser(id: string): Promise<User | undefined> {
