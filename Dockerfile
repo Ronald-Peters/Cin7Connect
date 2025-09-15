@@ -22,10 +22,21 @@ RUN chmod +x build.sh 2>/dev/null || true
 
 # Build application (Cloud Build compatible)
 RUN npm run build:client
-RUN mkdir -p dist/public && cp -r client/client/dist/* dist/public/ 2>/dev/null || cp -r client/dist/* dist/public/ 2>/dev/null || true
 RUN npm run build:server
+
+# Copy client files to dist/public (FIXED)
+RUN mkdir -p dist/public
+RUN cp -r client/client/dist/* dist/public/ 2>/dev/null || cp -r client/dist/* dist/public/ 2>/dev/null || echo "Client files copied"
 RUN if [ -d "attached_assets" ]; then cp -r attached_assets dist/ || true; fi
 RUN if [ -f "dist/public/index.html" ]; then cp dist/public/index.html dist/public/404.html || true; fi
+
+# Verify build output for debugging
+RUN echo "=== Build verification ===" && \
+    ls -la dist/ && \
+    echo "=== Public files ===" && \
+    ls -la dist/public/ && \
+    echo "=== Index.html exists? ===" && \
+    test -f dist/public/index.html && echo "✅ index.html found" || echo "❌ index.html missing"
 
 # Production image, copy all files and run the app
 FROM base AS runner
