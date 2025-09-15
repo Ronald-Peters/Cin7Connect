@@ -1,8 +1,7 @@
 import type { Express } from "express";
 import session from "express-session";
 import passport from "passport";
-// @ts-ignore - connect-sqlite3 doesn't have types
-import SQLiteStoreFactory from "connect-sqlite3";
+import { storage } from "./storage";
 
 /**
  * What we store in the session cookie.
@@ -15,7 +14,7 @@ export type SessionUser = {
   customerId?: string | null;
 };
 
-const SQLiteStore = SQLiteStoreFactory(session);
+// Using Postgres session store from storage.ts
 
 /**
  * Call this once in server boot (you already do in routes/index.ts)
@@ -24,14 +23,11 @@ export function setupAuth(app: Express) {
   // Replit / proxies need this so secure cookies work when you later enable HTTPS
   app.set("trust proxy", 1);
 
-  // --- Session middleware backed by SQLite (persistent) ---
+  // --- Session middleware backed by Postgres (Cloud Run compatible) ---
   app.use(
     session({
-      // Store sessions in a local SQLite file (persist across restarts)
-      store: new SQLiteStore({
-        db: "sessions.sqlite",
-        dir: ".", // write to project root (works in Replit)
-      }),
+      // Use Postgres session store (production-ready)
+      store: storage.sessionStore,
       name: "connect.sid",
       secret: process.env.SESSION_SECRET || "change-me-in-env",
       resave: false,
@@ -41,8 +37,8 @@ export function setupAuth(app: Express) {
         maxAge: 1000 * 60 * 60 * 24,
         // Replit serves your API and frontend on same origin, so Lax is perfect
         sameSite: "lax",
-        // Keep false for HTTP on replit.app; set true when you move to HTTPS
-        secure: false,
+        // Set true for production HTTPS (Cloud Run)
+        secure: process.env.NODE_ENV === "production",
         httpOnly: true,
       },
     })

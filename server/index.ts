@@ -21,25 +21,11 @@ app.set("trust proxy", 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Simple session (cookie-based)
+// Session configuration moved to auth.ts to avoid conflicts
 // Ensure secure session secret
 if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET environment variable is required for production");
 }
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: false, // set true when behind HTTPS proxy that sets `trust proxy`
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    },
-  })
-);
 
 // ---------- Auth (minimal, works today) ----------
 type User = { id: string; email: string; role: "admin" | "user"; name?: string };
@@ -79,6 +65,16 @@ import { syncScheduler } from "./scheduler";
 
 // ---------- Import Cin7 Service ----------
 import { cin7Service } from "./services/cin7";
+
+// ---------- Global Error Handlers (PRODUCTION FIX) ----------
+process.on('unhandledRejection', (reason, promise) => {
+  log(`❌ Unhandled Rejection at: ${promise}, reason: ${reason}`);
+});
+
+process.on('uncaughtException', (error) => {
+  log(`❌ Uncaught Exception: ${error.message}`);
+  log(`Stack: ${error.stack}`);
+});
 
 // ---------- Health / connectivity ----------
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
@@ -363,11 +359,21 @@ app.get(/^(?!\/api).*/, (_req, res) => {
 registerRoutes(app);
 
 // ---------- Error handler (MUST be after all routes) ----------
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
-  log(`Error middleware: ${message}`);
-  res.status(status).json({ message });
+  
+  // Enhanced error logging for production debugging
+  log(`❌ Error on ${req.method} ${req.path}: ${message}`);
+  log(`❌ Stack trace: ${err.stack}`);
+  
+  // For API routes, return JSON; for frontend routes, let SPA handle
+  if (req.path.startsWith('/api/')) {
+    res.status(status).json({ error: "Internal Server Error", details: process.env.NODE_ENV === 'production' ? undefined : message });
+  } else {
+    // For frontend routes, redirect to SPA fallback
+    res.status(500).send('Server Error - Please try refreshing the page');
+  }
 });
 
 // ---------- Start ----------
