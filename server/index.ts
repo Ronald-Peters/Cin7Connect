@@ -338,51 +338,28 @@ app.get("/catalog", requireAuth, async (_req, res) => {
   res.redirect("/"); // Let SPA handle `/catalog` if you prefer
 });
 
-// ---------- SPA / landing (HOME) ----------
-function sendSpa(req: Request, res: Response) {
-  const indexHtml =
-    process.env.NODE_ENV === "production"
-      ? path.resolve(__dirname, "./public/index.html")  // Correct: server/public/index.html
-      : path.resolve(__dirname, "../dist/public/index.html");
+// ---------- SPA Fallback (FIXED FOR PRODUCTION) ----------
+
+// SPA fallback for all non-API routes (CRITICAL FIX)
+app.get(/^(?!\/api).*/, (_req, res) => {
+  const indexPath = path.join(publicPath, "index.html");
   
-  log(`🔍 Attempting to serve SPA from: ${indexHtml}`);
-  
-  // Check if file exists first
-  import('fs').then(fs => {
-    if (!fs.existsSync(indexHtml)) {
-      log(`❌ SPA file not found at: ${indexHtml}`);
-      log(`📂 Available files in directory:`);
-      try {
-        const dir = path.dirname(indexHtml);
-        const files = fs.readdirSync(dir);
-        files.forEach(file => log(`  - ${file}`));
-      } catch (e: any) {
-        log(`❌ Cannot read directory: ${e.message || e}`);
-      }
-      return res.status(500).send("App failed to load - index.html not found");
+  // Simple, production-safe file serving
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      log(`❌ SPA fallback failed: ${err.message}`);
+      log(`📂 Tried to serve: ${indexPath}`);
+      log(`📂 publicPath: ${publicPath}`);
+      log(`📂 __dirname: ${__dirname}`);
+      res.status(500).json({ 
+        error: "Frontend not available",
+        details: process.env.NODE_ENV === 'production' ? undefined : err.message 
+      });
     }
-    
-    res.sendFile(indexHtml, (err) => {
-      if (err) {
-        log(`❌ Error serving SPA: ${err.message}`);
-        log(`📂 File exists but failed to serve from: ${indexHtml}`);
-        res.status(500).send("App failed to load - serve error");
-      } else {
-        log(`✅ Successfully served SPA from: ${indexHtml}`);
-      }
-    });
-  }).catch((e: any) => {
-    log(`❌ Import error: ${e.message || e}`);
-    res.status(500).send("App failed to load - import error");
   });
-}
+});
 
-// Home should be the landing page
-app.get("/", sendSpa);
-// And let these routes also load the SPA so the React router can handle them
-app.get(["/auth", "/login", "/admin", "/app", "/catalog/*", "/profile", "/cart"], sendSpa);
-
-// ---------- Setup Routes ----------
+// ---------- Setup API Routes (MUST be after static, before SPA fallback) ----------
 registerRoutes(app);
 
 // ---------- Error handler (MUST be after all routes) ----------
