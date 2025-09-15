@@ -46,6 +46,58 @@ jobs:
         with:
           project_id: ${{ secrets.GOOGLE_CLOUD_ID }}
 
+      - name: Create Required Secrets and Grant Permissions
+        run: |
+          echo "🔧 Setting up Secret Manager configuration..."
+          
+          # Validate required secrets are not empty
+          if [ -z "${{ secrets.DATABASE_URL }}" ]; then
+            echo "❌ ERROR: DATABASE_URL secret is empty or missing in GitHub repo"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.CIN7_ACCOUNT_ID }}" ]; then
+            echo "⚠️ WARNING: CIN7_ACCOUNT_ID secret is empty - Cin7 integration will be disabled"
+          fi
+          
+          if [ -z "${{ secrets.CIN7_APP_KEY }}" ]; then
+            echo "⚠️ WARNING: CIN7_APP_KEY secret is empty - Cin7 integration will be disabled"
+          fi
+          
+          # Create or update secrets with validation
+          echo "Creating/updating DATABASE_URL secret..."
+          echo "${{ secrets.DATABASE_URL }}" | gcloud secrets create DATABASE_URL --data-file=- --replication-policy=automatic || {
+            echo "Secret exists, updating to latest version..."
+            echo "${{ secrets.DATABASE_URL }}" | gcloud secrets versions add DATABASE_URL --data-file=-
+          }
+          
+          if [ -n "${{ secrets.CIN7_ACCOUNT_ID }}" ]; then
+            echo "Creating/updating CIN7_ACCOUNT_ID secret..."
+            echo "${{ secrets.CIN7_ACCOUNT_ID }}" | gcloud secrets create CIN7_ACCOUNT_ID --data-file=- --replication-policy=automatic || {
+              echo "Secret exists, updating to latest version..."
+              echo "${{ secrets.CIN7_ACCOUNT_ID }}" | gcloud secrets versions add CIN7_ACCOUNT_ID --data-file=-
+            }
+          fi
+          
+          if [ -n "${{ secrets.CIN7_APP_KEY }}" ]; then
+            echo "Creating/updating CIN7_APP_KEY secret..."
+            echo "${{ secrets.CIN7_APP_KEY }}" | gcloud secrets create CIN7_APP_KEY --data-file=- --replication-policy=automatic || {
+              echo "Secret exists, updating to latest version..."
+              echo "${{ secrets.CIN7_APP_KEY }}" | gcloud secrets versions add CIN7_APP_KEY --data-file=-
+            }
+          fi
+          
+          # Grant Cloud Run service account access to secrets
+          echo "🔐 Granting secret access permissions..."
+          PROJECT_NUMBER=$(gcloud projects describe ${{ secrets.GOOGLE_CLOUD_ID }} --format="value(projectNumber)")
+          SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+          
+          gcloud secrets add-iam-policy-binding DATABASE_URL --member="serviceAccount:${SERVICE_ACCOUNT}" --role="roles/secretmanager.secretAccessor" || true
+          gcloud secrets add-iam-policy-binding CIN7_ACCOUNT_ID --member="serviceAccount:${SERVICE_ACCOUNT}" --role="roles/secretmanager.secretAccessor" || true
+          gcloud secrets add-iam-policy-binding CIN7_APP_KEY --member="serviceAccount:${SERVICE_ACCOUNT}" --role="roles/secretmanager.secretAccessor" || true
+          
+          echo "✅ Secret Manager configuration complete!"
+
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -57,7 +109,7 @@ jobs:
             --memory=1Gi
             --cpu=1
             --port=8080
-            --set-env-vars=NODE_ENV=production,FROM_EMAIL=noreply@reiviloindustrial.co.za,SUPPORT_EMAIL=support@reiviloindustrial.co.za,SESSION_SECRET=reivilo-b2b-session-secret-2025,SYNC_TOKEN=reivilo-sync-token-2025
+            --set-env-vars=NODE_ENV=production,FROM_EMAIL=noreply@reiviloindustrial.co.za,SUPPORT_EMAIL=support@reiviloindustrial.co.za,SESSION_SECRET=reivilo-b2b-session-secret-2025,SYNC_TOKEN=reivilo-sync-token-2025,ADMIN_EMAIL=ronald@reiviloindustrial.co.za,ADMIN_PASSWORD=Ron@Reiv25
             --set-secrets=DATABASE_URL=DATABASE_URL:latest,CIN7_ACCOUNT_ID=CIN7_ACCOUNT_ID:latest,CIN7_APP_KEY=CIN7_APP_KEY:latest
             # Fixed: Removed ADMIN_EMAIL/ADMIN_PASSWORD secrets causing deployment failure
             # Enhanced logging added to diagnose Cloud Run startup issues

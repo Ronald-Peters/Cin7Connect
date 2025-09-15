@@ -70,21 +70,26 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      // Check admin credentials with fallbacks
+      // Check admin credentials - PRODUCTION SECURITY: Require environment variables
       const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
       const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
       
-      // Fallback credentials for production/development
-      const adminEmail = ADMIN_EMAIL || "ronald@reiviloindustrial.co.za";
-      const adminPassword = ADMIN_PASSWORD || "Ron@Reiv25";
+      // SECURITY: No fallback credentials in production - require proper env vars
+      if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+        console.error(`[LOGIN] SECURITY: Admin credentials not configured properly`);
+        return res.status(500).json({ 
+          message: "Server configuration error", 
+          error: "Admin authentication not properly configured" 
+        });
+      }
       
-      console.log(`[LOGIN] Admin email available: ${!!ADMIN_EMAIL}, Using: ${adminEmail}`);
+      console.log(`[LOGIN] Admin email configured: ${!!ADMIN_EMAIL}`);
       console.log(`[LOGIN] Attempting login for: ${email}`);
       
-      if (email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword) {
+      if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD) {
         const user = { 
           id: "admin-1", 
-          email: adminEmail.toLowerCase(), 
+          email: ADMIN_EMAIL.toLowerCase(), 
           role: "admin", 
           name: "Admin" 
         };
