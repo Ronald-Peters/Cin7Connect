@@ -63,6 +63,3 @@ jobs:
             --cpu=1
             --port=8080
             --set-env-vars=NODE_ENV=production,FROM_EMAIL=noreply@reiviloindustrial.co.za,SUPPORT_EMAIL=support@reiviloindustrial.co.za
-            # Fixed: Removed ADMIN_EMAIL/ADMIN_PASSWORD secrets causing deployment failure
-            # Enhanced logging added to diagnose Cloud Run startup issues
-            # FIXED: Removed admin credentials crash causing 404 errors
