@@ -463,28 +463,28 @@ export function registerRoutes(app: Express): Server {
   // Products (direct from Cin7)
   // -------------------------
   app.get("/api/products", async (req, res) => {
+    console.log("[PRODUCTS] Request received:", req.query);
     try {
       const q = ((req.query.q as string) || "").trim();
-      const limit =
-        parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10) || 50;
+      const page = parseInt((req.query.page as string) || "1", 10) || 1;
+      const limit = parseInt((req.query.limit as string) || (req.query.pageSize as string) || "50", 10) || 50;
 
-      const result = await (cin7Service as any).getProducts?.({
-        search: q,
-        limit,
-      });
+      // Serve directly from database with timeout protection
+      const result = await Promise.race([
+        storage.getProducts(q, page, limit),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Database query timeout")), 5000)
+        )
+      ]);
 
-      // Accept multiple shapes from the service
-      const items =
-        Array.isArray(result)
-          ? result
-          : result?.data ??
-            result?.items ??
-            result?.Products ??
-            [];
+      // storage.getProducts returns { products: [...], total: number }
+      const items = (result as any)?.products || [];
+      const total = (result as any)?.total || 0;
 
+      console.log(`[PRODUCTS] Returning ${items.length} products, total: ${total}`);
       res.json({
         items,
-        total: Array.isArray(items) ? items.length : 0,
+        total,
       });
     } catch (error) {
       console.error("Error fetching products:", error);
