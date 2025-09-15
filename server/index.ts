@@ -122,6 +122,8 @@ app.get("/api/warehouses", async (_req, res) => {
 });
 
 // ---------- Products (availability grouped JHB/CPT/BFN + “20+” cap) ----------
+// DISABLED - Legacy route causing infinite loops - moved to server/routes.ts
+/*
 app.get("/api/products", async (req, res) => {
   try {
     const limit = Number(req.query.limit || 1000);
@@ -218,6 +220,7 @@ app.get("/api/products", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch products" });
   }
 });
+*/
 
 // ---------- Raw availability (debug-heavy) ----------
 app.get("/api/availability", async (req, res) => {
