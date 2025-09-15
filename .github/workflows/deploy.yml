@@ -57,6 +57,6 @@ jobs:
             --memory=1Gi
             --cpu=1
             --port=8080
-            --set-env-vars=NODE_ENV=production,FROM_EMAIL=noreply@reiviloindustrial.co.za,SUPPORT_EMAIL=support@reiviloindustrial.co.za
-            --set-secrets=DATABASE_URL=DATABASE_URL:latest,CIN7_ACCOUNT_ID=CIN7_ACCOUNT_ID:latest,CIN7_APP_KEY=CIN7_APP_KEY:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,SESSION_SECRET=SESSION_SECRET:latest,SYNC_TOKEN=SYNC_TOKEN:latest
+            --set-env-vars=NODE_ENV=production,FROM_EMAIL=noreply@reiviloindustrial.co.za,SUPPORT_EMAIL=support@reiviloindustrial.co.za,SESSION_SECRET=reivilo-b2b-session-secret-2025,SYNC_TOKEN=reivilo-sync-token-2025
+            --set-secrets=DATABASE_URL=DATABASE_URL:latest,CIN7_ACCOUNT_ID=CIN7_ACCOUNT_ID:latest,CIN7_APP_KEY=CIN7_APP_KEY:latest
             # Fixed: Removed ADMIN_EMAIL/ADMIN_PASSWORD secrets causing deployment failure
