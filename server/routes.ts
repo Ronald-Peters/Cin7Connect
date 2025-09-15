@@ -70,14 +70,15 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      // Check admin credentials first
+      // Check admin credentials with fallbacks
       const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
       const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
       
-      // For development, use hardcoded admin credentials
-      const isDev = process.env.NODE_ENV === 'development';
+      // Fallback credentials for production/development
       const adminEmail = ADMIN_EMAIL || "ronald@reiviloindustrial.co.za";
       const adminPassword = ADMIN_PASSWORD || "Ron@Reiv25";
+      
+      console.log(`[LOGIN] Admin email available: ${!!ADMIN_EMAIL}, Using: ${adminEmail}`);
       
       if (email.toLowerCase() === adminEmail.toLowerCase() && password === adminPassword) {
         const user = { 
