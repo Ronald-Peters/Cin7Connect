@@ -389,6 +389,8 @@ if (process.env.NODE_ENV === 'production') {
   log(`   PORT: ${PORT}`);
   log(`   NODE_ENV: ${process.env.NODE_ENV}`);
   log(`   DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET'}`);
+  log(`   CIN7_ACCOUNT_ID: ${process.env.CIN7_ACCOUNT_ID ? 'SET' : 'NOT SET'}`);
+  log(`   CIN7_APP_KEY: ${process.env.CIN7_APP_KEY ? 'SET' : 'NOT SET'}`);
 }
 
 // Add startup logging

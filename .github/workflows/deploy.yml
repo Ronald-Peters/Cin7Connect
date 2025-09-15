@@ -60,3 +60,4 @@ jobs:
             --set-env-vars=NODE_ENV=production,FROM_EMAIL=noreply@reiviloindustrial.co.za,SUPPORT_EMAIL=support@reiviloindustrial.co.za,SESSION_SECRET=reivilo-b2b-session-secret-2025,SYNC_TOKEN=reivilo-sync-token-2025
             --set-secrets=DATABASE_URL=DATABASE_URL:latest,CIN7_ACCOUNT_ID=CIN7_ACCOUNT_ID:latest,CIN7_APP_KEY=CIN7_APP_KEY:latest
             # Fixed: Removed ADMIN_EMAIL/ADMIN_PASSWORD secrets causing deployment failure
+            # Enhanced logging added to diagnose Cloud Run startup issues
